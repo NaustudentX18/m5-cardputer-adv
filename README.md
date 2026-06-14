@@ -109,12 +109,12 @@ project-slug/
       <td><code>██████</code> 60%</td>
     </tr>
     <tr>
-    <tr>
       <td><b>α 0.3</b></td>
       <td><b>Calendar intelligence</b> — AI-generated schedule suggestions, accept/reject flow, <code>.ics</code> export, reminders</td>
       <td><img src="https://img.shields.io/badge/REAL_PLANNER-ffb300?style=flat-square" alt="Real planner in progress"></td>
       <td><code>████████</code> 80%</td>
     </tr>
+    <tr>
       <td><b>α 0.4</b></td>
       <td><b>Voice capture</b> — ES8311 recording, WAV→SD, transcription bridge, transcript→plan pipeline</td>
       <td><img src="https://img.shields.io/badge/PLANNED-555?style=flat-square" alt="Planned"></td>
