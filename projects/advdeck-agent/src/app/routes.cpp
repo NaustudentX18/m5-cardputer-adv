@@ -6,6 +6,7 @@
 // task list, and A03 / A05 will fill in the rest. main.cpp owns the
 // loop and the active route; this file just maps Route -> draw+wait.
 
+#include "app/calendar.h"
 #include "app/routes.h"
 
 #include "app/tasks.h"
@@ -88,7 +89,7 @@ Route route_task_list(Ctx& ctx, const std::string& slug) {
 }
 
 Route route_calendar(Ctx& ctx) {
-  return render_route_label(ctx, "Calendar");
+  return route_calendar_impl(ctx);
 }
 
 }  // namespace app
