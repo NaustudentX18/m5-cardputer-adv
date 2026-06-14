@@ -8,7 +8,7 @@
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="#"><img src="https://img.shields.io/badge/platform-ESP32--S3-00f0ff?logo=espressif" alt="ESP32-S3"></a>
   <a href="#"><img src="https://img.shields.io/badge/hardware-Cardputer--Adv-ffb300" alt="Cardputer-Adv"></a>
-  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/alpha_0.3-real_planner-ffb300?style=flat-square" alt="Phase 3 real planner in progress"></a>
+  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/alpha_0.4-voice_capture-44cc11?style=flat-square" alt="Phase 4 voice capture done"></a>
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/stargazers"><img src="https://img.shields.io/github/stars/NaustudentX18/m5-cardputer-adv?style=social" alt="Stars"></a>
 </p>
 
@@ -84,7 +84,7 @@ project-slug/
 
 ## ✦ Roadmap
 
-**Current progress:** `██████████░░░░░░░░░░` **80%** complete · **Phase 3 of 5**
+**Current progress:** `████████████░░░░░░░░` **100%** complete · **Phase 4 of 5**
 
 <table>
   <thead>
@@ -117,8 +117,9 @@ project-slug/
     <tr>
       <td><b>α 0.4</b></td>
       <td><b>Voice capture</b> — ES8311 recording, WAV→SD, transcription bridge, transcript→plan pipeline</td>
-      <td><img src="https://img.shields.io/badge/PLANNED-555?style=flat-square" alt="Planned"></td>
-      <td><code>░░░░░░░░░░</code> 0%</td>
+      <td><img src="https://img.shields.io/badge/VOICE_CAPTURE-44cc11?style=flat-square" alt="Voice capture done"></td>
+      <td><code>██████████</code> 100%</td>
+    </tr>
     </tr>
     <tr>
       <td><b>β 0.5</b></td>
