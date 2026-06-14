@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "t-1",
+      "title": "Uses an unsupported status value",
+      "status": "in-progress"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CalendarSuggestions",
+  "type": "object",
+  "required": ["version", "suggestions"],
+  "properties": {
+    "version": { "type": "number", "const": 1 },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "starts_at"],
+        "properties": {
+          "title":     { "type": "string", "minLength": 1 },
+          "starts_at": { "type": "string", "format": "date-time" },
+          "ends_at":   { "type": "string", "format": "date-time" },
+          "remind_at": { "type": "string", "format": "date-time" },
+          "project":   { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

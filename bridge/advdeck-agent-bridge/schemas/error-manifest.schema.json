@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BridgeErrorManifest",
+  "type": "object",
+  "required": ["request_id", "status", "error_code", "message", "retryable"],
+  "properties": {
+    "request_id": { "type": "string", "pattern": "^req-[0-9]{8}-[0-9]{3,6}$" },
+    "status":     { "type": "string", "enum": ["error"] },
+    "error_code": { "type": "string", "enum": ["invalid_ai_output", "bridge_timeout", "storage_error", "unknown"] },
+    "message":    { "type": "string", "minLength": 1 },
+    "retryable":  { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

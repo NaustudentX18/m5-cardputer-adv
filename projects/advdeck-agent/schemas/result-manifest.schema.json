@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BridgeResultManifest",
+  "type": "object",
+  "required": ["request_id", "status", "artifacts", "warnings"],
+  "properties": {
+    "request_id":   { "type": "string", "pattern": "^req-[0-9]{8}-[0-9]{3,6}$" },
+    "status":       { "type": "string", "enum": ["ok"] },
+    "artifacts":    { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "warnings":     { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

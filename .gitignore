@@ -13,6 +13,8 @@ dist/
 projects/advdeck-agent/.notes/
 projects/advdeck-agent/firmware/
 
+# Phase 2: bridge task notes (ephemeral, kept locally only)
+bridge/advdeck-agent-bridge/.notes/
 # Phase 1: host test build artifacts
 projects/advdeck-agent/test/host/run_tests
 projects/advdeck-agent/test/host/run_tests.dSYM/
