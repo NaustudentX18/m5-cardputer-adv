@@ -32,16 +32,16 @@ Later, when you're back at your network, the **bridge service** does the heavy l
 ```mermaid
 flowchart LR
     subgraph Pocket["Cardputer-Adv"]
-        KB["Keyboard<br/>Capture"]
-        SD["SD Storage<br/>Offline Projects"]
-        UI["Review UI<br/>Accept / Reject"]
+        KB["Keyboard / Capture"]
+        SD["SD Storage / Offline Projects"]
+        UI["Review UI / Accept-Reject"]
     end
 
     subgraph Bridge["Bridge Service"]
-        STT["Speech-to-Text<br/>adapter"]
-        PLAN["LLM Planner<br/>adapter"]
-        VAL["Schema<br/>Validation"]
-        EXP["Agent Pack<br/>Writer"]
+        STT["Speech-to-Text / adapter"]
+        PLAN["LLM Planner / adapter"]
+        VAL["Schema / Validation"]
+        EXP["Agent Pack / Writer"]
     end
 
     subgraph Output["Output Targets"]
