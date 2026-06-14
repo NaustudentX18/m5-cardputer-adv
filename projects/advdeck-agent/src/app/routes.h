@@ -20,6 +20,7 @@ class CalendarStore; // A05
 class StagingQueue;  // B2.1 — accepts/rejects bridge-produced artifacts
 class OutboxQueue;   // B2.1 — sync UI reads + retries rows
 class AgentPackExporter; // B2.1 — Export route trigger
+class ReminderWatcher;   // E1.1 — reminder watchdog
 namespace app {
 
 struct Ctx {
@@ -44,11 +45,21 @@ struct Ctx {
   // the implementation; the dispatcher lazy-inits this the same
   // way it lazy-inits calendar.
   AgentPackExporter* exporter = nullptr;
+  // E1.1: ReminderWatcher used by the reminder alert route and
+  // the dispatcher's 5-second poll timer. Lazy — main.cpp wires
+  // it once the dispatcher starts.
+  ReminderWatcher* reminder = nullptr;
 
   // Set by route_capture_impl after a successful create_project so
   // the dispatcher can resolve a returned Route::ProjectDetail into a
   // real slug. Cleared (or replaced) by the dispatcher once consumed.
   std::string last_created_slug;
+  // Sticky event id used by the dispatcher to pass an event id
+  // through the Route::CalendarEditor transition. route_calendar_impl
+  // writes the selected event's id here before returning
+  // Route::CalendarEditor; route_calendar_editor_impl reads it
+  // after the dispatcher calls it. Cleared once consumed.
+  std::string last_event_id;
   // Explicit ctor so the dispatcher in main.cpp can brace-initialize
   // even though the struct has default member initializers (which
   // would otherwise make it non-aggregate under C++14).
@@ -58,13 +69,15 @@ struct Ctx {
       CalendarStore* cal = nullptr,
       OutboxQueue* ob = nullptr,
       StagingQueue* sq = nullptr,
-      AgentPackExporter* ex = nullptr)
+      AgentPackExporter* ex = nullptr,
+      ReminderWatcher* rm = nullptr)
       : storage(s), projects(p), tasks_for(tf), tasks_ctx(tc),
-        calendar(cal), outbox(ob), staging(sq), exporter(ex) {}
+        calendar(cal), outbox(ob), staging(sq), exporter(ex), reminder(rm) {}
 };
 
 enum class Route { Home, Capture, ProjectList, ProjectDetail, TaskList,
-                   Calendar, Sync, Export, Review, Record };
+                   Calendar, CalendarEditor, Sync, Export, Review, Record,
+                   Reminder, Help };
 
 // Enter (draw) and tick (handle one key event) for each route. tick
 // returns the route to switch to; Route::Home to stay.
@@ -74,11 +87,13 @@ Route route_project_list(Ctx& ctx);
 Route route_project_detail(Ctx& ctx, const std::string& slug);
 Route route_task_list(Ctx& ctx, const std::string& slug);
 Route route_calendar(Ctx& ctx);
+Route route_calendar_editor(Ctx& ctx, const std::string& event_id);
 Route route_sync(Ctx& ctx);
 Route route_export(Ctx& ctx);
 Route route_review(Ctx& ctx, const std::string& request_id);
 Route route_record(Ctx& ctx);
-Route route_record_list(Ctx& ctx, const std::string& slug);
+Route route_reminder_alert(Ctx& ctx);
+Route route_help(Ctx& ctx);
 
 // One-shot render-and-wait. Draws the route label and blocks until
 // any key is pressed, then returns the route the dispatcher should

@@ -13,6 +13,7 @@ same ``--storage-root`` at the same time (PHASE-2-INTERFACES.md §4.2).
 """
 from __future__ import annotations
 
+import builtins
 import json
 import sys
 from datetime import datetime, timezone
@@ -49,6 +50,8 @@ from .runner import (
     run_once,
     write_error_manifest,
 )
+from .ics_export import IcsExporter, validate as ics_validate
+from .nl_date import parse_nl_date
 
 
 def _coerce_root(path: str | None) -> Path:
@@ -306,6 +309,96 @@ def validate_cmd(fixture: Path, schema: Path) -> None:
         click.echo(f"invalid: {exc}", err=True)
         sys.exit(1)
     click.echo("ok")
+
+
+# ---------------------------------------------------------------------------
+# calendar
+# ---------------------------------------------------------------------------
+#
+# Phase 5 (E1.2) per PHASE-5-INTERFACES.md §5.1 / §5.2: produce a
+# single VCALENDAR file from the events the firmware has accepted
+# into <storage-root>/calendar/events.json. The events.json file is
+# the same shape the firmware writes; we read it here and project it
+# to .ics text via IcsExporter.
+
+
+@main.group(help="Calendar utilities (Phase 5).")
+def calendar() -> None:
+    """``advdeck-bridge calendar ...`` group."""
+
+
+@calendar.command(name="export",
+                  help="Export <storage-root>/calendar/events.json to an "
+                       "RFC 5545 .ics file. Exits 0 on success, 1 if the "
+                       "calendar directory is missing.")
+@click.option("--storage-root", default=None, metavar="<path>",
+              help="Storage root (default: /advdeck).")
+@click.option("--out", "out_path", required=True, metavar="<ics_path>",
+              type=click.Path(dir_okay=False, path_type=Path),
+              help="Path to write the .ics file to. Overwritten if it exists.")
+def calendar_export(storage_root: str | None, out_path: Path) -> None:
+    root = _coerce_root(storage_root)
+    events_path = root / "calendar" / "events.json"
+    if not events_path.exists():
+        click.echo(
+            f"calendar export: missing {events_path}; create it with the "
+            f"firmware's calendar editor first.",
+            err=True,
+        )
+        sys.exit(1)
+    try:
+        payload = json.loads(events_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        click.echo(f"calendar export: events.json is not valid JSON: {exc}",
+                   err=True)
+    import builtins
+    if not isinstance(payload, builtins.dict):
+        click.echo("calendar export: events.json must be a JSON object.",
+                   err=True)
+        sys.exit(1)
+    events = payload.get("events", [])
+    if not isinstance(events, builtins.list):
+        click.echo("calendar export: events.json 'events' must be a list.",
+                   err=True)
+        sys.exit(1)
+    ics_text = IcsExporter().build(events)
+    errors = ics_validate(ics_text)
+    if errors:
+        # Internal consistency: we just built it from a list of
+        # dicts, so a validation failure here is a bug, not user
+        # input. Surface clearly.
+        for err in errors:
+            click.echo(f"calendar export: built .ics is invalid: {err}",
+                       err=True)
+        sys.exit(2)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(ics_text, encoding="utf-8")
+    n = sum(1 for e in events if e.get("status", "accepted") in {"accepted"})
+    click.echo(f"calendar export: wrote {n} accepted event(s) to {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# nl-date
+# ---------------------------------------------------------------------------
+#
+# Phase 5 (E1.2) per PHASE-5-INTERFACES.md §5.3: parse a short
+# English natural-language date expression and print the ISO8601
+# result. ``--now`` lets tests and operator scripts pin the clock.
+
+
+@main.command(help="Parse a short English date expression and print ISO8601. "
+                    "Prints the ISO timestamp on stdout; empty string on "
+                    "unparseable input. Exits 0 always (use the output to "
+                    "detect 'unparseable' from caller code).")
+@click.option("--text", "text", required=True, metavar="<text>",
+              help="The natural-language date expression to parse.")
+@click.option("--now", "now_iso", default=None, metavar="<iso>",
+              help="Reference 'now' in ISO8601 (default: current UTC).")
+def nl_date(text: str, now_iso: str | None) -> None:
+    if not now_iso:
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = parse_nl_date(text, now_iso=now_iso)
+    click.echo(result)
 
 
 if __name__ == "__main__":
