@@ -11,6 +11,11 @@ dist/
 projects/advdeck-agent/.notes/
 projects/advdeck-agent/firmware/
 
+# Phase 1: host test build artifacts
+projects/advdeck-agent/test/host/*.o
+projects/advdeck-agent/test/host/run_tests
+projects/advdeck-agent/test/host/run_tests.dSYM/
+
 # Python
 __pycache__/
 .pytest_cache/
