@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "advdeck/agent_pack_exporter.h"
 #include "advdeck/outbox_queue.h"
@@ -155,6 +156,37 @@ void loop() {
           ctx.last_created_slug = current_slug;
           next = advdeck::app::route_export(ctx);
           break;
+        case advdeck::app::Route::Review: {
+          // B3.1: pull the most recent pending staging entry and
+          // hand it to route_review. If there is nothing pending,
+          // show a stub message and bounce back to the home menu.
+          std::vector<advdeck::StagingEntry> pending;
+          std::string err;
+          const std::string r =
+              g_staging.list_pending(&pending, &err);
+          if (!r.empty() || pending.empty()) {
+            advdeck::platform::Display& d = display();
+            d.begin();
+            d.clear();
+            advdeck::ui::StatusBar bar(d);
+            bar.draw(g_storage.is_mounted());
+            d.text(4, 24, 0xF800, "Review");
+            d.text(4, 36, 0xFFFF, "no pending reviews");
+            d.text(4, advdeck::platform::Display::kHeight - 10, 0x7BEF,
+                   "[any key] back");
+            d.push();
+            for (;;) {
+              const advdeck::platform::KeyEvent ev =
+                  advdeck::platform::poll();
+              if (ev.any) break;
+            }
+            next = advdeck::app::Route::Home;
+            break;
+          }
+          // entry is the most recent.
+          next = advdeck::app::route_review(ctx, pending.back().request_id);
+          break;
+        }
         case advdeck::app::Route::Home:
           next = advdeck::app::Route::Home;
           break;

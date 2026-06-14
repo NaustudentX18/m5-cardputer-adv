@@ -53,7 +53,8 @@ UI_SRCS := \
 # the sync UI test.
 APP_SRCS := \
 	$(ROOT)/src/app/sync.cpp \
-	$(ROOT)/src/app/export.cpp
+	$(ROOT)/src/app/export.cpp \
+	$(ROOT)/src/app/review.cpp
 
 TEST_SRCS := \
 	test_main.cpp \
@@ -68,7 +69,8 @@ TEST_SRCS := \
 	test_sync_ui.cpp \
 	test_bridge_import.cpp \
 	test_bridge_log.cpp \
-	test_agent_pack_exporter.cpp
+	test_agent_pack_exporter.cpp \
+	test_review_screen.cpp
 
 # Optional: test_text_editor.cpp is added by A03 when the editor lands.
 EXTRA_TEST_SRCS := $(wildcard test_text_editor.cpp)

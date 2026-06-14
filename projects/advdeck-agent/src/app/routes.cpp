@@ -11,6 +11,7 @@
 #include "app/calendar.h"
 #include "app/sync.h"
 #include "app/export.h"
+#include "app/review.h"
 #include "app/routes.h"
 
 #include "app/tasks.h"
@@ -62,7 +63,7 @@ Route route_home(Ctx& ctx) {
   // capture / projects / tasks / calendar. Each entry just shows its
   // label for now; A03..A05 will replace the body.
   const std::vector<std::string> items = {
-      "Capture", "Projects", "Tasks", "Calendar", "Sync", "Export",
+      "Capture", "Projects", "Tasks", "Calendar", "Sync", "Export", "Review",
   };
   const ui::Menu menu(disp());
   const ui::MenuResult picked = menu.run(items, 0);
@@ -74,6 +75,7 @@ Route route_home(Ctx& ctx) {
     case 3: return Route::Calendar;
     case 4: return Route::Sync;
     case 5: return Route::Export;
+    case 6: return Route::Review;
     default: return Route::Home;
   }
 }
@@ -132,6 +134,13 @@ Route route_export(Ctx& ctx) {
     if (!list.empty()) slug = list[0].slug;
   }
   return route_export_impl(ctx, slug);
+}
+
+Route route_review(Ctx& ctx, const std::string& request_id) {
+  // B3.1 thin wrapper. The actual key loop lives in review.cpp's
+  // route_review_impl so the host tests can build the summary
+  // string without driving a blocking display.
+  return route_review_impl(ctx, request_id);
 }
 
 }  // namespace app

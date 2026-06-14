@@ -64,7 +64,7 @@ struct Ctx {
 };
 
 enum class Route { Home, Capture, ProjectList, ProjectDetail, TaskList,
-                   Calendar, Sync, Export };
+                   Calendar, Sync, Export, Review };
 
 // Enter (draw) and tick (handle one key event) for each route. tick
 // returns the route to switch to; Route::Home to stay.
@@ -76,6 +76,7 @@ Route route_task_list(Ctx& ctx, const std::string& slug);
 Route route_calendar(Ctx& ctx);
 Route route_sync(Ctx& ctx);
 Route route_export(Ctx& ctx);
+Route route_review(Ctx& ctx, const std::string& request_id);
 
 // One-shot render-and-wait. Draws the route label and blocks until
 // any key is pressed, then returns the route the dispatcher should

@@ -1,9 +1,9 @@
 // src/services/bridge_import.cpp
 //
 // Read a result manifest from <root>/outbox/results/<id>/result.json,
-// validate it, and copy the listed artifacts into the matching
-// project folder. See PHASE-2-INTERFACES.md §5.3, §6 and §4.1 for
-// the contract.
+// validate it, and either stage the artifacts (Phase 3 default) or
+// copy them straight into the matching project folder (Phase 2 shim).
+// See PHASE-3-INTERFACES.md §5.3 and PHASE-2-INTERFACES.md §5.3, §6.
 //
 // Validation strategy: per the project non-goals, we do NOT pull in
 // a JSON Schema validator (nlohmann::json-schema is not vendored).
@@ -17,10 +17,12 @@
 // engine. Schema-pattern keywords are checked with a tiny
 // hand-rolled matcher; std::regex is forbidden by the non-goals.
 //
-// The dry-run provider is deterministic and the review gate is
-// auto. Phase 3 will introduce staging + a real review screen;
-// the import body leaves a `TODO(phase-3)` marker where the
-// staging copy will go.
+// Phase 3: stage_only() is the new entry point. It validates the
+// manifest, then calls StagingQueue::stage() to copy the artifacts
+// to outbox/staging/<id>/. The user accepts or rejects via the
+// review screen. The old import() is now a thin shim that calls
+// stage_only() then StagingQueue::accept() so the verify.sh
+// end-to-end test (which still uses import) keeps working.
 
 #include "advdeck/bridge_import.h"
 
@@ -37,6 +39,7 @@
 
 #include "advdeck/pending_request.h"
 #include "advdeck/schema_embed.h"
+#include "advdeck/staging_queue.h"
 
 namespace advdeck {
 namespace {
@@ -456,8 +459,8 @@ std::string lookup_project_slug(IStorage& storage,
 BridgeImport::BridgeImport(IStorage& storage, std::string storage_root)
     : storage_(&storage), storage_root_(std::move(storage_root)) {}
 
-std::string BridgeImport::import(const std::string& request_id,
-                                 ImportResult* out, std::string* err) {
+std::string BridgeImport::stage_only(const std::string& request_id,
+                                     ImportResult* out, std::string* err) {
   if (out) {
     out->ok = false;
     out->request_id = request_id;
@@ -467,11 +470,11 @@ std::string BridgeImport::import(const std::string& request_id,
     out->retryable = false;
   }
   if (request_id.empty()) {
-    if (err) *err = "import: empty request id";
+    if (err) *err = "stage_only: empty request id";
     return *err;
   }
   if (!valid_id(request_id)) {
-    if (err) *err = "import: request id is malformed";
+    if (err) *err = "stage_only: request id is malformed";
     return *err;
   }
   // Locate the result.json for this request.
@@ -480,14 +483,14 @@ std::string BridgeImport::import(const std::string& request_id,
   std::string request_dir = storage_->join(results_root, request_id);
   std::string result_path = storage_->join(request_dir, "result.json");
   if (!storage_->exists(result_path)) {
-    std::string msg = "import: missing " + result_path;
+    std::string msg = "stage_only: missing " + result_path;
     if (out) out->error_message = msg;
     if (err) *err = msg;
     return msg;
   }
   std::string raw = storage_->read_file(result_path);
   if (raw.empty()) {
-    std::string msg = "import: result.json is empty or unreadable";
+    std::string msg = "stage_only: result.json is empty or unreadable";
     if (out) out->error_message = msg;
     if (err) *err = msg;
     return msg;
@@ -500,8 +503,8 @@ std::string BridgeImport::import(const std::string& request_id,
   }
   if (m.is_error_manifest) {
     // Error path: surface the manifest's error fields, do not
-    // touch the project folder. The caller (route_sync) will
-    // call mark_terminal(id, "error", ...).
+    // touch staging or the project folder. The caller
+    // (route_sync) will call mark_terminal(id, "error", ...).
     if (out) {
       out->ok = false;
       out->error_message = m.error_message;
@@ -510,8 +513,7 @@ std::string BridgeImport::import(const std::string& request_id,
     if (err) *err = m.error_message;
     return m.error_message;
   }
-  // Success path: figure out the project slug, copy each
-  // allowed artifact.
+  // Validate the project slug.
   std::string slug = lookup_project_slug(
       *storage_,
       storage_->join(storage_->join(storage_root_, "outbox"),
@@ -519,30 +521,34 @@ std::string BridgeImport::import(const std::string& request_id,
       request_id);
   if (slug.empty()) {
     std::string msg =
-        "import: no pending.jsonl row for " + request_id +
+        "stage_only: no pending.jsonl row for " + request_id +
         " (bridge wrote a result before the firmware enqueued?)";
     if (out) out->error_message = msg;
     if (err) *err = msg;
     return msg;
   }
   if (!valid_slug(slug)) {
-    std::string msg = "import: pending.jsonl slug for " + request_id +
+    std::string msg = "stage_only: pending.jsonl slug for " + request_id +
                       " does not match slug pattern";
     if (out) out->error_message = msg;
     if (err) *err = msg;
     return msg;
   }
-  // TODO(phase-3): staging + review gate. For Phase 2 (dry-run,
-  // auto-accepted) we copy straight into the project folder.
-  std::string project_dir = storage_->join(
-      storage_->join(storage_root_, "projects"), slug);
-  std::string e = storage_->ensure_dir(project_dir);
-  if (!e.empty()) {
-    std::string msg = "import: ensure_dir(" + project_dir + "): " + e;
+  // Hand off to StagingQueue::stage. Construct a local
+  // StagingQueue (two pointers, essentially free) since
+  // BridgeImport doesn't own one.
+  StagingQueue staging(*storage_, storage_root_);
+  std::string stage_err;
+  std::string s = staging.stage(request_id, &stage_err);
+  if (!s.empty()) {
+    std::string msg = "stage_only: " + s;
     if (out) out->error_message = msg;
     if (err) *err = msg;
     return msg;
   }
+  // Build imported_files from the staging dir.
+  std::string staging_dir = staging.staging_dir();
+  std::string entry_dir = storage_->join(staging_dir, request_id);
   std::vector<std::string> imported;
   std::vector<std::string> warns;
   for (const auto& name : m.artifacts) {
@@ -550,19 +556,101 @@ std::string BridgeImport::import(const std::string& request_id,
       warns.push_back("skipping unknown artifact: " + name);
       continue;
     }
-    std::string src = storage_->join(request_dir, name);
-    if (!storage_->exists(src)) {
+    std::string dst = storage_->join(entry_dir, name);
+    if (!storage_->exists(dst)) {
       warns.push_back("artifact missing on disk: " + name);
       continue;
     }
-    std::string body = storage_->read_file(src);
+    imported.push_back(dst);
+  }
+  if (out) {
+    out->ok = true;
+    out->imported_files = imported;
+    out->warnings = warns;
+  }
+  if (err) err->clear();
+  return "";
+}
+
+std::string BridgeImport::import(const std::string& request_id,
+                                 ImportResult* out, std::string* err) {
+  // Phase 2 shim, kept for verify.sh. New callers MUST use
+  // stage_only and let the user accept/reject via the review
+  // screen. This shim does: stage_only -> StagingQueue::accept,
+  // then rewrites imported_files to project-folder paths.
+  std::string e;
+  std::string stage_err;
+  if (out) {
+    out->ok = false;
+    out->request_id = request_id;
+    out->imported_files.clear();
+    out->warnings.clear();
+    out->error_message.clear();
+    out->retryable = false;
+  }
+  e = stage_only(request_id, out, err);
+  if (!e.empty()) {
+    return e;
+  }
+  if (out && !out->ok) {
+    // Error manifest: out->error_message already populated.
+    if (err && err->empty()) {
+      *err = out->error_message;
+    }
+    return err ? *err : out->error_message;
+  }
+  // Look up the project slug for accept's project_dir.
+  std::string slug = lookup_project_slug(
+      *storage_,
+      storage_->join(storage_->join(storage_root_, "outbox"),
+                     "pending.jsonl"),
+      request_id);
+  if (slug.empty()) {
+    std::string msg = "import: no pending.jsonl row for " + request_id;
+    if (out) out->error_message = msg;
+    if (err) *err = msg;
+    return msg;
+  }
+  std::string project_dir = storage_->join(
+      storage_->join(storage_root_, "projects"), slug);
+  std::string ensure_err;
+  e = storage_->ensure_dir(project_dir);
+  if (!e.empty()) {
+    std::string msg = "import: ensure_dir(" + project_dir + "): " + e;
+    if (out) out->error_message = msg;
+    if (err) *err = msg;
+    return msg;
+  }
+  StagingQueue staging(*storage_, storage_root_);
+  std::string accept_err;
+  e = staging.accept(request_id, &accept_err);
+  if (!e.empty()) {
+    if (out) out->error_message = "import: accept: " + e;
+    if (err) *err = "import: accept: " + e;
+    return err ? *err : e;
+  }
+  // Rewrite imported_files to project-folder paths.
+  std::string results_root = storage_->join(
+      storage_->join(storage_root_, "outbox"), "results");
+  std::string request_dir = storage_->join(results_root, request_id);
+  std::string raw = storage_->read_file(
+      storage_->join(request_dir, "result.json"));
+  std::vector<std::string> manifest_artifacts;
+  ManifestCheck m = validate_manifest(raw, request_id);
+  if (m.ok && !m.is_error_manifest) {
+    manifest_artifacts = m.artifacts;
+  }
+  std::vector<std::string> imported;
+  std::vector<std::string> warns;
+  for (const auto& name : manifest_artifacts) {
+    if (allowed_artifacts().count(name) == 0) {
+      warns.push_back("skipping unknown artifact: " + name);
+      continue;
+    }
     std::string dst = storage_->join(project_dir, name);
-    e = storage_->write_file(dst, body);
-    if (!e.empty()) {
-      std::string msg = "import: write_file(" + dst + "): " + e;
-      if (out) out->error_message = msg;
-      if (err) *err = msg;
-      return msg;
+    if (!storage_->exists(dst)) {
+      warns.push_back("artifact missing on disk: " + name);
+      continue;
     }
     imported.push_back(dst);
   }
