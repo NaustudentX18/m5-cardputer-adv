@@ -21,6 +21,7 @@ from pathlib import Path
 import click
 
 from . import validation
+from .providers import ProviderUnavailable, get_provider
 from .paths import (
     DEFAULT_STORAGE_ROOT,
     pending_path,
@@ -113,6 +114,59 @@ def plan(project_slug: str, storage_root: str | None) -> None:
     if result.manifest.get("warnings"):
         for warn in result.manifest["warnings"]:
             click.echo(f"warning: {warn}")
+
+# ---------------------------------------------------------------------------
+# plan-local
+# ---------------------------------------------------------------------------
+#
+# Phase 3 (C1.1) per PHASE-3-INTERFACES.md §6: read pre-rendered
+# artefacts from a directory instead of running an LLM. Used by
+# A11 (agent-pack export tests) and Z03 (end-to-end smoke). The
+# flow is identical to ``plan``: enqueue, mark in_flight, render,
+# write the result dir + manifest. The provider swap is the only
+# difference.
+
+
+@main.command(
+    help="Render a planning result from pre-built artefacts on disk. "
+         "Identical output shape to ``plan``; the provider is the local-file "
+         "reader (PHASE-3-INTERFACES.md §6).",
+)
+@click.option("--project", "project_slug", required=True, metavar="<slug>",
+              help="Project slug (must match ^[a-z0-9][a-z0-9-]{0,63}$).")
+@click.option("--artifacts", "artifacts_dir", required=True, metavar="<dir>",
+              type=click.Path(exists=True, file_okay=False, dir_okay=True,
+                               path_type=Path),
+              help="Directory containing pre-rendered brief.md, plan.md, "
+                   "tasks.json, tasks.md, calendar-suggestions.json, "
+                   "agent-prompt.md.")
+@click.option("--storage-root", default=None, metavar="<path>",
+              help="Storage root (default: /advdeck).")
+def plan_local(project_slug: str, artifacts_dir: Path,
+               storage_root: str | None) -> None:
+    root = _coerce_root(storage_root)
+    try:
+        provider = get_provider("local-file", artifacts_dir=str(artifacts_dir))
+    except ProviderUnavailable as exc:
+        click.echo(f"plan-local: error: {exc}", err=True)
+        sys.exit(2)
+    try:
+        result = plan_project(root, project_slug, provider=provider)
+    except BridgeError as exc:
+        click.echo(f"plan-local: error: {exc}", err=True)
+        sys.exit(2)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"plan-local: unexpected error: {exc}", err=True)
+        sys.exit(2)
+
+    click.echo(f"plan-local: wrote {len(result.manifest['artifacts'])} "
+               f"artefacts to {result.artifacts_dir}")
+    for name in result.manifest["artifacts"]:
+        click.echo(f"  - {name}")
+    if result.manifest.get("warnings"):
+        for warn in result.manifest["warnings"]:
+            click.echo(f"warning: {warn}")
+
 
 
 # ---------------------------------------------------------------------------
