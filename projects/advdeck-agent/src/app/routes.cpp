@@ -1,13 +1,14 @@
 // src/app/routes.cpp
 //
-// Phase 1 stubs. Each route draws a short label and waits for any
-// key, then returns to the home route. A03 (Capture / ProjectList /
-// ProjectDetail) and A04/A05 (TaskList / Calendar) will replace these
-// bodies in later tasks. We deliberately keep them tiny so the
-// dispatcher is the only place main.cpp needs to know about.
+// Per-screen dispatcher. Each route draws once when entered, then
+// is driven by the main loop. Phase 1 keeps most routes tiny stubs;
+// A04 (this task) replaces the TaskList body with a real per-project
+// task list, and A03 / A05 will fill in the rest. main.cpp owns the
+// loop and the active route; this file just maps Route -> draw+wait.
 
 #include "app/routes.h"
 
+#include "app/tasks.h"
 #include "platform/display.h"
 #include "platform/keyboard.h"
 #include "ui/menu.h"
@@ -81,8 +82,9 @@ Route route_project_detail(Ctx& ctx, const std::string& slug) {
 }
 
 Route route_task_list(Ctx& ctx, const std::string& slug) {
-  (void)slug;
-  return render_route_label(ctx, "Tasks");
+  // A04 owns this route. main.cpp will plumb the slug from the
+  // project-picker once A03 lands; for now we just delegate.
+  return route_task_list_impl(ctx, slug);
 }
 
 Route route_calendar(Ctx& ctx) {
