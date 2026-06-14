@@ -8,7 +8,7 @@
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="#"><img src="https://img.shields.io/badge/platform-ESP32--S3-00f0ff?logo=espressif" alt="ESP32-S3"></a>
   <a href="#"><img src="https://img.shields.io/badge/hardware-Cardputer--Adv-ffb300" alt="Cardputer-Adv"></a>
-  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/status-planning-888" alt="Status: Planning"></a>
+  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/alpha_0.1-44cc11?style=flat-square" alt="Alpha 0.1 done"></a>
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/stargazers"><img src="https://img.shields.io/github/stars/NaustudentX18/m5-cardputer-adv?style=social" alt="Stars"></a>
 </p>
 
@@ -84,7 +84,7 @@ project-slug/
 
 ## ✦ Roadmap
 
-**Current progress:** `████████░░░░░░░░░░░░` **20%** complete · **Phase 1 of 5**
+**Current progress:** `████░░░░░░░░░░░░░░░` **40%** complete · **Phase 1 of 5**
 
 <table>
   <thead>
@@ -99,8 +99,8 @@ project-slug/
     <tr>
       <td><b>α 0.1</b></td>
       <td><b>Text-to-plan loop</b> — firmware skeleton, SD storage, idea capture, fixture import, review UI, agent pack export</td>
-      <td><img src="https://img.shields.io/badge/IN_PROGRESS-ffb300?style=flat-square" alt="In Progress"></td>
-      <td><code>██░░░░░░░░</code> 20%</td>
+      <td><img src="https://img.shields.io/badge/DONE-44cc11?style=flat-square" alt="Done"></td>
+      <td><code>██████████</code> 100%</td>
     </tr>
     <tr>
       <td><b>α 0.2</b></td>
