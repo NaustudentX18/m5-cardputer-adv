@@ -6,13 +6,14 @@ dist/
 *.elf
 *.map
 *.uf2
+*.o
+*.a
 
 # Phase 1: agent task notes (ephemeral, kept locally only)
 projects/advdeck-agent/.notes/
 projects/advdeck-agent/firmware/
 
 # Phase 1: host test build artifacts
-projects/advdeck-agent/test/host/*.o
 projects/advdeck-agent/test/host/run_tests
 projects/advdeck-agent/test/host/run_tests.dSYM/
 
