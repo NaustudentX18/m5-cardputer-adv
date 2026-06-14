@@ -1,0 +1,30 @@
+name: Repo Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  required-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required project files
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f ROADMAP.md
+          test -f AGENTS.md
+          test -f docs/PRODUCT.md
+          test -f docs/ARCHITECTURE.md
+          test -f docs/AGENT_HANDOFF.md
+          test -f roadmap/advdeck-agent-swarm-tasks.md
+          test -f projects/advdeck-agent/README.md
+      - name: Check for obvious committed secrets
+        run: |
+          set -euo pipefail
+          if grep -RInE "(OPENAI_API_KEY|ANTHROPIC_API_KEY|GITHUB_TOKEN|AWS_SECRET_ACCESS_KEY)=" . --exclude-dir=.git; then
+            echo "Potential secret found"
+            exit 1
+          fi

@@ -1,0 +1,45 @@
+# Build outputs
+.pio/
+build/
+dist/
+*.bin
+*.elf
+*.map
+*.uf2
+
+# Python
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+*.pyc
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+secrets.*
+config.local.*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Device data dumps
+sdcard/
+recordings/
+*.wav
+*.pcm
+
+# Logs
+*.log
+logs/
+
+# Local third-party research snapshots
+research/sources/poseidon/
+research/sources/community-projects/
