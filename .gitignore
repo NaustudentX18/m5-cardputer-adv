@@ -7,6 +7,10 @@ dist/
 *.map
 *.uf2
 
+# Phase 1: agent task notes (ephemeral, kept locally only)
+projects/advdeck-agent/.notes/
+projects/advdeck-agent/firmware/
+
 # Python
 __pycache__/
 .pytest_cache/
