@@ -120,7 +120,6 @@ project-slug/
       <td><img src="https://img.shields.io/badge/VOICE_CAPTURE-44cc11?style=flat-square" alt="Voice capture done"></td>
       <td><code>██████████</code> 100%</td>
     </tr>
-    </tr>
     <tr>
       <td><b>β 0.5</b></td>
       <td><b>Agent workflow polish</b> — stronger task schema, dependency ordering, role suggestions, workspace export</td>
