@@ -6,6 +6,8 @@
 // task list, and A03 / A05 will fill in the rest. main.cpp owns the
 // loop and the active route; this file just maps Route -> draw+wait.
 
+#include "app/capture.h"
+#include "app/projects.h"
 #include "app/calendar.h"
 #include "app/routes.h"
 
@@ -14,7 +16,6 @@
 #include "platform/keyboard.h"
 #include "ui/menu.h"
 #include "ui/status_bar.h"
-
 namespace advdeck {
 namespace app {
 
@@ -70,21 +71,33 @@ Route route_home(Ctx& ctx) {
 }
 
 Route route_capture(Ctx& ctx) {
-  return render_route_label(ctx, "Capture");
+  // A03 implementation. The impl uses the text editor and creates a
+  // new project, then signals Route::ProjectDetail by writing the
+  // slug to ctx.last_created_slug. The dispatcher in main.cpp reads
+  // that field to translate ProjectDetail into a real route call.
+  return route_capture_impl(ctx);
 }
 
 Route route_project_list(Ctx& ctx) {
-  return render_route_label(ctx, "Projects");
+  // A03 implementation. The impl writes the picked slug to
+  // ctx.last_created_slug so the dispatcher can chain to the detail
+  // route.
+  std::string slug;
+  const Route r = route_project_list_impl(ctx, &slug);
+  if (r == Route::ProjectDetail) {
+    ctx.last_created_slug = std::move(slug);
+  }
+  return r;
 }
 
 Route route_project_detail(Ctx& ctx, const std::string& slug) {
-  // Slug shown so A03 can replace this with a real detail view.
-  return render_route_label(ctx, "Project: " + slug);
+  // A03 implementation. 'e' enters idea-edit mode (the text editor);
+  // 't' returns Route::TaskList so the dispatcher can open A04's
+  // task view. Esc returns to the project list.
+  return route_project_detail_impl(ctx, slug);
 }
 
 Route route_task_list(Ctx& ctx, const std::string& slug) {
-  // A04 owns this route. main.cpp will plumb the slug from the
-  // project-picker once A03 lands; for now we just delegate.
   return route_task_list_impl(ctx, slug);
 }
 

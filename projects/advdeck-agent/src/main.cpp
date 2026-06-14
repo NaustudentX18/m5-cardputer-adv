@@ -92,23 +92,62 @@ void setup() {
 }
 
 void loop() {
-  M5Cardputer.update();
-  advdeck::app::Ctx ctx{
-      /*storage=*/g_storage,
-      /*projects=*/g_projects,
-      /*tasks_for=*/nullptr,
-      /*tasks_ctx=*/nullptr,
-      /*calendar=*/nullptr,
-  };
+// Tiny dispatcher. The home route drives the top-level menu and
+// returns the next route. ProjectList and Capture are themselves
+// blocking screens; we run them once per loop turn. Routes that
+// need a slug (ProjectDetail, TaskList) read it from
+// ctx.last_created_slug after a picker (route_project_list) or a
+// creator (route_capture) wrote it there. We keep a sticky
+// `current_slug` so route_project_detail -> TaskList -> ProjectList
+// chains stay on the same project without forcing the user to
+// re-pick.
+advdeck::app::Ctx ctx{g_storage, g_projects, nullptr, nullptr, nullptr};
+std::string current_slug;
+advdeck::app::Route next = advdeck::app::Route::Home;
+for (;;) {
+  next = advdeck::app::route_home(ctx);
+  if (next == advdeck::app::Route::Home) {
+    // Esc on the home menu — exit the app loop.
+    break;
+  }
+  while (next != advdeck::app::Route::Home) {
+    switch (next) {
+      case advdeck::app::Route::Capture:
+        next = advdeck::app::route_capture(ctx);
+        if (next == advdeck::app::Route::ProjectDetail) {
+          current_slug = ctx.last_created_slug;
+        }
+        break;
+      case advdeck::app::Route::ProjectList: {
+        const advdeck::app::Route r = advdeck::app::route_project_list(ctx);
+        if (r == advdeck::app::Route::ProjectDetail) {
+          current_slug = ctx.last_created_slug;
+        }
+        next = r;
+        break;
+      }
+      case advdeck::app::Route::ProjectDetail:
+        if (!ctx.last_created_slug.empty()) {
+          current_slug = ctx.last_created_slug;
+        }
+        next = advdeck::app::route_project_detail(ctx, current_slug);
+        break;
+      case advdeck::app::Route::TaskList:
+        next = advdeck::app::route_task_list(ctx, current_slug);
+        break;
+      case advdeck::app::Route::Calendar:
+        next = advdeck::app::route_calendar(ctx);
+        break;
+      case advdeck::app::Route::Home:
+        next = advdeck::app::Route::Home;
+        break;
+    }
+  }
+  // Drop back to the top of the outer loop, which re-shows the home
+  // menu.
+}
 
-  // Phase 1: the home route drives the top-level menu and returns
-  // the next route. The dispatcher then runs the chosen route, which
-  // for now is a label + wait-for-key stub. A03..A05 will replace
-  // these bodies; the dispatcher shape stays.
-  advdeck::app::Route next = advdeck::app::route_home(ctx);
-  (void)next;
-
-  // Yield to the watchdog / USB stack. 5 ms keeps the UI responsive
-  // (key repeat feels snappy) without spinning.
-  delay(5);
+// Yield to the watchdog / USB stack. 5 ms keeps the UI responsive
+// (key repeat feels snappy) without spinning.
+delay(5);
 }

@@ -31,6 +31,10 @@ struct Ctx {
   // Forward-declared so we don't pull its header in here.
   CalendarStore* calendar = nullptr;
 
+  // Set by route_capture_impl after a successful create_project so
+  // the dispatcher can resolve a returned Route::ProjectDetail into a
+  // real slug. Cleared (or replaced) by the dispatcher once consumed.
+  std::string last_created_slug;
   // Explicit ctor so the dispatcher in main.cpp can brace-initialize
   // even though the struct has default member initializers (which
   // would otherwise make it non-aggregate under C++14).

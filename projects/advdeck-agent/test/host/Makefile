@@ -23,6 +23,13 @@ SERVICE_SRCS := \
 	$(ROOT)/src/services/calendar_store.cpp \
 	$(ROOT)/src/platform/host_storage.cpp
 
+# UI sources that have no Arduino / M5 dependency. text_editor.cpp
+# is fully host-portable: it has the firmware build wrapped in
+# #ifdef ADVDECK_FIRMWARE, so the host build links the buffer-only
+# paths cleanly.
+UI_SRCS := \
+	$(ROOT)/src/ui/text_editor.cpp
+
 TEST_SRCS := \
 	test_main.cpp \
 	test_slug.cpp \
@@ -40,7 +47,7 @@ TEST_SRCS_ALL := $(TEST_SRCS) $(EXTRA_TEST_SRCS)
 endif
 
 BIN := run_tests
-OBJS := $(TEST_SRCS_ALL:.cpp=.o) $(SERVICE_SRCS:.cpp=.o)
+OBJS := $(TEST_SRCS_ALL:.cpp=.o) $(SERVICE_SRCS:.cpp=.o) $(UI_SRCS:.cpp=.o)
 
 .PHONY: all test clean
 
