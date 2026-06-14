@@ -18,6 +18,8 @@ classifiers = [
 dependencies = [
     "click>=8.0,<9.0",
     "jsonschema>=4.0,<5.0",
+    "rfc3339-validator>=0.1.0",   # provides the date-time format checker
+    "rfc3986-validator>=0.1.0",   # provides the uri / iri format checkers
 ]
 
 [project.optional-dependencies]
