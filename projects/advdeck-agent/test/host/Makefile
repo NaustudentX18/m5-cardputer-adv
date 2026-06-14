@@ -26,16 +26,34 @@ SERVICE_SRCS := \
 	$(ROOT)/src/services/task_store.cpp \
 	$(ROOT)/src/services/calendar_store.cpp \
 	$(ROOT)/src/services/outbox_queue.cpp \
+	$(ROOT)/src/services/staging_queue.cpp \
+	$(ROOT)/src/services/agent_pack_exporter.cpp \
 	$(ROOT)/src/services/bridge_import.cpp \
 	$(ROOT)/src/services/bridge_log.cpp \
 	$(ROOT)/src/platform/host_storage.cpp
+
+# Platform sources with no Arduino / M5 dependency on host.
+# Display and keyboard are no-ops on host (their M5GFX/M5Cardputer
+# includes are guarded by ADVDECK_FIRMWARE); we pull them in so the
+# sync UI test and any future route tests can link.
+PLATFORM_SRCS := \
+	$(ROOT)/src/platform/display.cpp \
+	$(ROOT)/src/platform/keyboard.cpp
 
 # UI sources that have no Arduino / M5 dependency. text_editor.cpp
 # is fully host-portable: it has the firmware build wrapped in
 # #ifdef ADVDECK_FIRMWARE, so the host build links the buffer-only
 # paths cleanly.
 UI_SRCS := \
-	$(ROOT)/src/ui/text_editor.cpp
+	$(ROOT)/src/ui/text_editor.cpp \
+	$(ROOT)/src/ui/status_bar.cpp
+
+# B2.1 + C1.2 routes pull in display, status bar, and outbox
+# queue; the host build of all three is the source of truth for
+# the sync UI test.
+APP_SRCS := \
+	$(ROOT)/src/app/sync.cpp \
+	$(ROOT)/src/app/export.cpp
 
 TEST_SRCS := \
 	test_main.cpp \
@@ -45,8 +63,12 @@ TEST_SRCS := \
 	test_task_store.cpp \
 	test_calendar_store.cpp \
 	test_outbox_queue.cpp \
+	test_outbox_compact.cpp \
+	test_staging_queue.cpp \
+	test_sync_ui.cpp \
 	test_bridge_import.cpp \
-	test_bridge_log.cpp
+	test_bridge_log.cpp \
+	test_agent_pack_exporter.cpp
 
 # Optional: test_text_editor.cpp is added by A03 when the editor lands.
 EXTRA_TEST_SRCS := $(wildcard test_text_editor.cpp)
@@ -57,7 +79,9 @@ TEST_SRCS_ALL := $(TEST_SRCS) $(EXTRA_TEST_SRCS)
 endif
 
 BIN := run_tests
-OBJS := $(TEST_SRCS_ALL:.cpp=.o) $(SERVICE_SRCS:.cpp=.o) $(UI_SRCS:.cpp=.o)
+OBJS := $(TEST_SRCS_ALL:.cpp=.o) $(SERVICE_SRCS:.cpp=.o) \
+        $(PLATFORM_SRCS:.cpp=.o) $(UI_SRCS:.cpp=.o) \
+        $(APP_SRCS:.cpp=.o)
 
 # Generated schema header. Re-run the embed script whenever one of
 # the two vendored schemas (or the script itself) changes. The
@@ -68,8 +92,8 @@ SCHEMA_EMBED := $(ROOT)/include/advdeck/schema_embed.h
 SCHEMA_DEPS := \
 	$(ROOT)/schemas/pending-request.schema.json \
 	$(ROOT)/schemas/result-manifest.schema.json \
+	$(ROOT)/schemas/agent-pack-export-info.schema.json \
 	$(ROOT)/scripts/build_schema_embed.py
-
 .PHONY: all test clean schemas
 
 all: $(BIN)

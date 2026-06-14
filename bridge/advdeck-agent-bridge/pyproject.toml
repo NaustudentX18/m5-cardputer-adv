@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "advdeck-bridge"
-version = "0.2.0"
-description = "AdvDeck Agent Phase 2 dry-run bridge CLI."
+version = "0.3.0"
+description = "AdvDeck Agent Phase 3 bridge CLI (dry-run + local-file + opt-in OpenAI providers)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -25,6 +25,12 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=8.0",
+]
+# The live "openai" provider is opt-in. The base install stays light
+# so users who only need the dry-run / local-file providers do not
+# pull in the OpenAI SDK.
+live = [
+    "openai>=1.0,<2.0",
 ]
 
 [project.scripts]

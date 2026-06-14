@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentPackExportInfo",
+  "type": "object",
+  "required": ["version", "exported_at", "project_slug", "planner_provider", "planner_version"],
+  "properties": {
+    "version": { "type": "number", "const": 1 },
+    "exported_at": { "type": "string", "format": "date-time" },
+    "project_slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "planner_provider": { "type": "string" },
+    "planner_version": { "type": "string" },
+    "request_id": { "type": "string" },
+    "artifact_hashes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

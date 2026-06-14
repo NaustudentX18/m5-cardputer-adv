@@ -17,6 +17,9 @@
 namespace advdeck {
 class TaskStore;     // A04
 class CalendarStore; // A05
+class StagingQueue;  // B2.1 — accepts/rejects bridge-produced artifacts
+class OutboxQueue;   // B2.1 — sync UI reads + retries rows
+class AgentPackExporter; // B2.1 — Export route trigger
 namespace app {
 
 struct Ctx {
@@ -30,6 +33,17 @@ struct Ctx {
   // A05 will provide a single CalendarStore for the whole app.
   // Forward-declared so we don't pull its header in here.
   CalendarStore* calendar = nullptr;
+  // B2.1: a single OutboxQueue shared by the sync UI and any
+  // future callers (the export route looks at it too). Lazy —
+  // main.cpp constructs it once the dispatcher starts.
+  OutboxQueue* outbox = nullptr;
+  // B2.1: a single StagingQueue. B3.1's review screen consumes
+  // the same instance.
+  StagingQueue* staging = nullptr;
+  // B2.1: AgentPackExporter for the Export menu entry. C1.2 owns
+  // the implementation; the dispatcher lazy-inits this the same
+  // way it lazy-inits calendar.
+  AgentPackExporter* exporter = nullptr;
 
   // Set by route_capture_impl after a successful create_project so
   // the dispatcher can resolve a returned Route::ProjectDetail into a
@@ -41,12 +55,16 @@ struct Ctx {
   Ctx(IStorage& s, ProjectStore& p,
       TaskStore* (*tf)(const std::string&, void*) = nullptr,
       void* tc = nullptr,
-      CalendarStore* cal = nullptr)
+      CalendarStore* cal = nullptr,
+      OutboxQueue* ob = nullptr,
+      StagingQueue* sq = nullptr,
+      AgentPackExporter* ex = nullptr)
       : storage(s), projects(p), tasks_for(tf), tasks_ctx(tc),
-        calendar(cal) {}
+        calendar(cal), outbox(ob), staging(sq), exporter(ex) {}
 };
 
-enum class Route { Home, Capture, ProjectList, ProjectDetail, TaskList, Calendar };
+enum class Route { Home, Capture, ProjectList, ProjectDetail, TaskList,
+                   Calendar, Sync, Export };
 
 // Enter (draw) and tick (handle one key event) for each route. tick
 // returns the route to switch to; Route::Home to stay.
@@ -56,6 +74,8 @@ Route route_project_list(Ctx& ctx);
 Route route_project_detail(Ctx& ctx, const std::string& slug);
 Route route_task_list(Ctx& ctx, const std::string& slug);
 Route route_calendar(Ctx& ctx);
+Route route_sync(Ctx& ctx);
+Route route_export(Ctx& ctx);
 
 // One-shot render-and-wait. Draws the route label and blocks until
 // any key is pressed, then returns the route the dispatcher should

@@ -1,11 +1,10 @@
 // src/main.cpp
 //
-// AdvDeck Agent — boot + main loop. Phase 1 scope:
+// AdvDeck Agent — boot + main loop. Phase 3 scope:
 //   1. Bring up M5Cardputer and the display.
 //   2. Try to mount the SD card via the IStorage facade; the Phase 1
 //      SdStorage stub returns false, which the status bar reports as
-//      "SD:NONE". The UI must still be usable in that state — A03
-//      can capture into RAM and flush on next mount.
+//      "SD:NONE". The UI must still be usable in that state.
 //   3. Land on the home route. The main loop polls the keyboard and
 //      dispatches the active route.
 //
@@ -18,7 +17,10 @@
 #include <cstdint>
 #include <string>
 
+#include "advdeck/agent_pack_exporter.h"
+#include "advdeck/outbox_queue.h"
 #include "advdeck/project_store.h"
+#include "advdeck/staging_queue.h"
 #include "advdeck/storage.h"
 #include "app/routes.h"
 #include "platform/display.h"
@@ -64,6 +66,12 @@ NullStorage g_storage;
 
 advdeck::ProjectStore g_projects(g_storage, "/advdeck");
 
+// B2.1: shared service instances. Constructed once at boot; the
+// dispatcher in loop() passes them into the Ctx.
+advdeck::OutboxQueue g_outbox(g_storage, "/advdeck");
+advdeck::StagingQueue g_staging(g_storage, "/advdeck");
+advdeck::AgentPackExporter g_exporter(g_storage, "/advdeck");
+
 void draw_boot(bool sd_ok) {
   display().clear();
   advdeck::ui::StatusBar bar(display());
@@ -92,62 +100,71 @@ void setup() {
 }
 
 void loop() {
-// Tiny dispatcher. The home route drives the top-level menu and
-// returns the next route. ProjectList and Capture are themselves
-// blocking screens; we run them once per loop turn. Routes that
-// need a slug (ProjectDetail, TaskList) read it from
-// ctx.last_created_slug after a picker (route_project_list) or a
-// creator (route_capture) wrote it there. We keep a sticky
-// `current_slug` so route_project_detail -> TaskList -> ProjectList
-// chains stay on the same project without forcing the user to
-// re-pick.
-advdeck::app::Ctx ctx{g_storage, g_projects, nullptr, nullptr, nullptr};
-std::string current_slug;
-advdeck::app::Route next = advdeck::app::Route::Home;
-for (;;) {
-  next = advdeck::app::route_home(ctx);
-  if (next == advdeck::app::Route::Home) {
-    // Esc on the home menu — exit the app loop.
-    break;
-  }
-  while (next != advdeck::app::Route::Home) {
-    switch (next) {
-      case advdeck::app::Route::Capture:
-        next = advdeck::app::route_capture(ctx);
-        if (next == advdeck::app::Route::ProjectDetail) {
-          current_slug = ctx.last_created_slug;
-        }
-        break;
-      case advdeck::app::Route::ProjectList: {
-        const advdeck::app::Route r = advdeck::app::route_project_list(ctx);
-        if (r == advdeck::app::Route::ProjectDetail) {
-          current_slug = ctx.last_created_slug;
-        }
-        next = r;
-        break;
-      }
-      case advdeck::app::Route::ProjectDetail:
-        if (!ctx.last_created_slug.empty()) {
-          current_slug = ctx.last_created_slug;
-        }
-        next = advdeck::app::route_project_detail(ctx, current_slug);
-        break;
-      case advdeck::app::Route::TaskList:
-        next = advdeck::app::route_task_list(ctx, current_slug);
-        break;
-      case advdeck::app::Route::Calendar:
-        next = advdeck::app::route_calendar(ctx);
-        break;
-      case advdeck::app::Route::Home:
-        next = advdeck::app::Route::Home;
-        break;
+  // Tiny dispatcher. The home route drives the top-level menu and
+  // returns the next route. ProjectList and Capture are themselves
+  // blocking screens; we run them once per loop turn. Routes that
+  // need a slug (ProjectDetail, TaskList, Export) read it from
+  // ctx.last_created_slug after a picker (route_project_list) or a
+  // creator (route_capture) wrote it there. We keep a sticky
+  // `current_slug` so route_project_detail -> TaskList -> ProjectList
+  // chains stay on the same project without forcing the user to
+  // re-pick. B2.1 added Sync and Export to the dispatcher.
+  advdeck::app::Ctx ctx{g_storage, g_projects, nullptr, nullptr, nullptr,
+                        &g_outbox, &g_staging, &g_exporter};
+  std::string current_slug;
+  advdeck::app::Route next = advdeck::app::Route::Home;
+  for (;;) {
+    next = advdeck::app::route_home(ctx);
+    if (next == advdeck::app::Route::Home) {
+      // Esc on the home menu — exit the app loop.
+      break;
     }
+    while (next != advdeck::app::Route::Home) {
+      switch (next) {
+        case advdeck::app::Route::Capture:
+          next = advdeck::app::route_capture(ctx);
+          if (next == advdeck::app::Route::ProjectDetail) {
+            current_slug = ctx.last_created_slug;
+          }
+          break;
+        case advdeck::app::Route::ProjectList: {
+          const advdeck::app::Route r = advdeck::app::route_project_list(ctx);
+          if (r == advdeck::app::Route::ProjectDetail) {
+            current_slug = ctx.last_created_slug;
+          }
+          next = r;
+          break;
+        }
+        case advdeck::app::Route::ProjectDetail:
+          if (!ctx.last_created_slug.empty()) {
+            current_slug = ctx.last_created_slug;
+          }
+          next = advdeck::app::route_project_detail(ctx, current_slug);
+          break;
+        case advdeck::app::Route::TaskList:
+          next = advdeck::app::route_task_list(ctx, current_slug);
+          break;
+        case advdeck::app::Route::Calendar:
+          next = advdeck::app::route_calendar(ctx);
+          break;
+        case advdeck::app::Route::Sync:
+          next = advdeck::app::route_sync(ctx);
+          break;
+        case advdeck::app::Route::Export:
+          // Stash the slug so route_export picks it up.
+          ctx.last_created_slug = current_slug;
+          next = advdeck::app::route_export(ctx);
+          break;
+        case advdeck::app::Route::Home:
+          next = advdeck::app::Route::Home;
+          break;
+      }
+    }
+    // Drop back to the top of the outer loop, which re-shows the home
+    // menu.
   }
-  // Drop back to the top of the outer loop, which re-shows the home
-  // menu.
-}
 
-// Yield to the watchdog / USB stack. 5 ms keeps the UI responsive
-// (key repeat feels snappy) without spinning.
-delay(5);
+  // Yield to the watchdog / USB stack. 5 ms keeps the UI responsive
+  // (key repeat feels snappy) without spinning.
+  delay(5);
 }

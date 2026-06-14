@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # scripts/build_schema_embed.py
 #
-# Generate include/advdeck/schema_embed.h from the two vendored JSON
-# schemas the firmware cares about (pending-request, result-manifest).
+# Generate include/advdeck/schema_embed.h from the vendored JSON
+# schemas the firmware cares about (pending-request, result-manifest,
+# agent-pack-export-info).
 #
 # We can't load the JSON files at runtime on the firmware (no SD in
 # Phase 2 — it's a stub), and the contract says no $ref / oneOf / anyOf,
@@ -23,17 +24,20 @@ import pathlib
 import sys
 
 
-# The two schemas the firmware validates against per the Phase 2
-# contract. Keep this list in sync with PHASE-2-INTERFACES.md §5.
+# The schemas the firmware embeds. Keep this list in sync with
+# PHASE-3-INTERFACES.md §3.1 / §5 and the firmware-side code that
+# references the corresponding k<Name>Schema symbols.
 SCHEMA_FILES = [
     "pending-request.schema.json",
     "result-manifest.schema.json",
+    "agent-pack-export-info.schema.json",
 ]
 
 # Map the file basename to the C++ symbol we expose.
 SYMBOL_NAMES = {
     "pending-request.schema.json": "kPendingRequestSchema",
     "result-manifest.schema.json": "kResultManifestSchema",
+    "agent-pack-export-info.schema.json": "kAgentPackExportInfoSchema",
 }
 
 
@@ -74,7 +78,7 @@ def render_header(schema_dir: pathlib.Path) -> str:
         "//",
         "// GENERATED FILE - DO NOT EDIT BY HAND.",
         "//",
-        "// Source: the two vendored JSON schemas under",
+        "// Source: the vendored JSON schemas under",
         "//   projects/advdeck-agent/schemas/",
         "// Regenerate with:",
         "//   python3 scripts/build_schema_embed.py",
@@ -83,7 +87,7 @@ def render_header(schema_dir: pathlib.Path) -> str:
         "//",
         "// This header embeds the JSON Schemas as C string literals so the",
         "// firmware can validate bridge results without an SD-backed file",
-        "// load (the SD impl is a stub in Phase 2).",
+        "// load (the SD impl is a stub in Phase 2/3).",
         "//",
         "#ifndef ADVDECK_INCLUDE_ADVDECK_SCHEMA_EMBED_H_",
         "#define ADVDECK_INCLUDE_ADVDECK_SCHEMA_EMBED_H_",
@@ -96,7 +100,7 @@ def render_header(schema_dir: pathlib.Path) -> str:
         path = schema_dir / filename
         if not path.is_file():
             raise FileNotFoundError(
-                f"schema file missing: {path} - see PHASE-2-INTERFACES.md §3"
+                f"schema file missing: {path} - see PHASE-3-INTERFACES.md §3"
             )
         body = path.read_text(encoding="utf-8")
         symbol = SYMBOL_NAMES[filename]

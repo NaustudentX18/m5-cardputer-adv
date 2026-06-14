@@ -370,4 +370,133 @@ std::string OutboxQueue::mark_terminal(const std::string& id,
   return "";
 }
 
+// Parse the YYYY-MM-DDTHH:MM:SSZ ISO8601 UTC timestamp that
+// IStorage::mtime_iso8601 returns. Returns -1 on malformed input
+// (which we treat as "very old" in compact_done, so a missing or
+// broken mtime drops the row — that matches the conservative
+// policy in the header doc).
+std::time_t parse_iso8601_to_epoch(const std::string& s) {
+  if (s.size() < 20) return -1;
+  std::tm tm{};
+  if (std::sscanf(s.c_str(), "%4d-%2d-%2dT%2d:%2d:%2d",
+                  &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+                  &tm.tm_hour, &tm.tm_min, &tm.tm_sec) != 6) {
+    return -1;
+  }
+  tm.tm_year -= 1900;
+  tm.tm_mon -= 1;
+#if defined(_WIN32)
+  return _mkgmtime(&tm);
+#else
+  // Portable UTC mktime. We use the fact that mktime treats the
+  // struct as local time; we adjust by the local offset of
+  // "now - 0" (i.e. compute the local offset, then subtract it).
+  std::time_t local_now = std::time(nullptr);
+  std::tm local_tm{};
+#if defined(_WIN32)
+  localtime_s(&local_tm, &local_now);
+#else
+  localtime_r(&local_now, &local_tm);
+#endif
+  std::time_t local_as_utc = mktime(&local_tm);
+  std::time_t offset = local_now - local_as_utc;
+  return mktime(&tm) + offset;
+#endif
+}
+
+std::string OutboxQueue::retry(const std::string& id, std::string* err) {
+  if (id.empty()) {
+    if (err) *err = "retry: empty id";
+    return *err;
+  }
+  std::vector<JsonlRow> rows = read_rows(*storage_, pending_path());
+  std::vector<PendingRequest> as_requests;
+  as_requests.reserve(rows.size());
+  bool found = false;
+  for (auto& row : rows) {
+    if (!row.ok) continue;
+    if (row.req.id == id) {
+      // PHASE-3-INTERFACES.md §5.4: no-op on already-pending or
+      // in_flight. We signal that with a non-empty *err so the
+      // caller can show a hint. The pending.jsonl is untouched.
+      if (row.req.status == "pending" || row.req.status == "in_flight") {
+        if (err) *err = "already pending";
+        return *err;
+      }
+      row.req.status = "pending";
+      row.req.attempts = 0;
+      row.req.created_at = now_iso8601_utc();
+      found = true;
+    }
+    as_requests.push_back(row.req);
+  }
+  if (!found) {
+    if (err) *err = "request not found: " + id;
+    return *err;
+  }
+  std::string e = write_rows(*storage_, pending_path(), as_requests, err);
+  if (!e.empty()) return e;
+  if (err) err->clear();
+  return "";
+}
+
+std::string OutboxQueue::compact_done(int days_threshold, int* removed,
+                                      std::string* err) {
+  if (removed) *removed = 0;
+  if (days_threshold < 0) {
+    if (err) *err = "compact_done: days_threshold must be >= 0";
+    return *err;
+  }
+  // Cutoff = now - days_threshold days. Rows whose results dir
+  // mtime is older than this are dropped.
+  const std::time_t now = std::time(nullptr);
+  const std::time_t cutoff = now - static_cast<std::time_t>(days_threshold) * 24 * 60 * 60;
+  std::vector<JsonlRow> rows = read_rows(*storage_, pending_path());
+  std::vector<PendingRequest> keep;
+  keep.reserve(rows.size());
+  int dropped = 0;
+  for (auto& row : rows) {
+    if (!row.ok) {
+      // Preserve the original "skip malformed lines" behavior:
+      // don't even put them in `keep`, just drop them silently.
+      ++dropped;
+      continue;
+    }
+    if (row.req.status != "done") {
+      keep.push_back(row.req);
+      continue;
+    }
+    // Per header doc: only drop `done` rows whose result dir
+    // mtime is older than the cutoff, OR whose result dir is
+    // missing (conservative: treat as old).
+    std::string rdir = storage_->join(results_dir(), row.req.id);
+    if (!storage_->exists(rdir)) {
+      // Result dir is gone — drop the row, no point in keeping a
+      // JSONL entry pointing at a vanished directory.
+      ++dropped;
+      continue;
+    }
+    std::string mtime = storage_->mtime_iso8601(rdir);
+    std::time_t t = parse_iso8601_to_epoch(mtime);
+    if (t < 0 || t < cutoff) {
+      ++dropped;
+      continue;
+    }
+    keep.push_back(row.req);
+  }
+  if (dropped == 0) {
+    if (removed) *removed = 0;
+    if (err) err->clear();
+    return "";
+  }
+  std::string e = write_rows(*storage_, pending_path(), keep, err);
+  if (!e.empty()) {
+    if (removed) *removed = 0;
+    return e;
+  }
+  if (removed) *removed = dropped;
+  if (err) err->clear();
+  return "";
+}
+
 }  // namespace advdeck

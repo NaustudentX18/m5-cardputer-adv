@@ -9,13 +9,19 @@
 #include "app/capture.h"
 #include "app/projects.h"
 #include "app/calendar.h"
+#include "app/sync.h"
+#include "app/export.h"
 #include "app/routes.h"
 
 #include "app/tasks.h"
+#include "advdeck/agent_pack_exporter.h"
+#include "advdeck/outbox_queue.h"
+#include "advdeck/staging_queue.h"
 #include "platform/display.h"
 #include "platform/keyboard.h"
 #include "ui/menu.h"
 #include "ui/status_bar.h"
+
 namespace advdeck {
 namespace app {
 
@@ -56,7 +62,7 @@ Route route_home(Ctx& ctx) {
   // capture / projects / tasks / calendar. Each entry just shows its
   // label for now; A03..A05 will replace the body.
   const std::vector<std::string> items = {
-      "Capture", "Projects", "Tasks", "Calendar",
+      "Capture", "Projects", "Tasks", "Calendar", "Sync", "Export",
   };
   const ui::Menu menu(disp());
   const ui::MenuResult picked = menu.run(items, 0);
@@ -66,6 +72,8 @@ Route route_home(Ctx& ctx) {
     case 1: return Route::ProjectList;
     case 2: return Route::TaskList;
     case 3: return Route::Calendar;
+    case 4: return Route::Sync;
+    case 5: return Route::Export;
     default: return Route::Home;
   }
 }
@@ -103,6 +111,27 @@ Route route_task_list(Ctx& ctx, const std::string& slug) {
 
 Route route_calendar(Ctx& ctx) {
   return route_calendar_impl(ctx);
+}
+
+Route route_sync(Ctx& ctx) {
+  return route_sync_impl(ctx);
+}
+
+Route route_export(Ctx& ctx) {
+  // The dispatcher passes the current slug via last_created_slug
+  // (the same channel route_project_list and route_capture use).
+  std::string slug;
+  if (!ctx.last_created_slug.empty()) {
+    slug = ctx.last_created_slug;
+    ctx.last_created_slug.clear();
+  } else {
+    // Fall back to the first project if the user came from the
+    // home menu straight to Export without picking a project.
+    std::string err;
+    std::vector<ProjectSummary> list = ctx.projects.list_projects(&err);
+    if (!list.empty()) slug = list[0].slug;
+  }
+  return route_export_impl(ctx, slug);
 }
 
 }  // namespace app

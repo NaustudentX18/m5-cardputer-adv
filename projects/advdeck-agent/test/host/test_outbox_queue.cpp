@@ -250,3 +250,52 @@ ADVDECK_REGISTER_TEST(outbox_enqueue_validates_input, enqueue_validates_input);
 ADVDECK_REGISTER_TEST(outbox_pending_path_layout, pending_path_layout);
 ADVDECK_REGISTER_TEST(outbox_mark_in_flight_unknown_id_errors,
                        mark_in_flight_unknown_id_errors);
+
+// --- B2.1: retry() and compact_done() ---
+
+void retry_sets_status_pending_attempts_zero() {
+  auto s = make_storage_with_unique_root();
+  advdeck::OutboxQueue q(s, "/advdeck");
+  std::string err;
+  std::string id = q.enqueue("p", "plan_project", {"idea.md"}, &err);
+  EXPECT_EQ(std::string(""), err);
+  q.mark_in_flight(id, &err);
+  q.mark_terminal(id, "error", &err);
+  // attempts is now 1.
+  std::string e = q.retry(id, &err);
+  EXPECT_EQ(std::string(""), e);
+  EXPECT_EQ(std::string(""), err);
+  std::vector<advdeck::PendingRequest> all;
+  q.load_all(&all, &err);
+  EXPECT_EQ(std::size_t(1), all.size());
+  EXPECT_EQ(std::string("pending"), all[0].status);
+  EXPECT_EQ(0, all[0].attempts);
+}
+
+void retry_on_pending_row_returns_already_pending() {
+  auto s = make_storage_with_unique_root();
+  advdeck::OutboxQueue q(s, "/advdeck");
+  std::string err;
+  std::string id = q.enqueue("p", "plan_project", {"idea.md"}, &err);
+  EXPECT_EQ(std::string(""), err);
+  // Row is pending. retry should be a no-op with "already pending".
+  std::string e = q.retry(id, &err);
+  EXPECT_EQ(std::string("already pending"), e);
+  EXPECT_EQ(std::string("already pending"), err);
+}
+
+void retry_on_unknown_id_returns_not_found() {
+  auto s = make_storage_with_unique_root();
+  advdeck::OutboxQueue q(s, "/advdeck");
+  std::string err;
+  std::string e = q.retry("req-20260614-001", &err);
+  EXPECT_TRUE(!e.empty());
+  EXPECT_TRUE(err.find("request not found") != std::string::npos);
+}
+
+ADVDECK_REGISTER_TEST(outbox_retry_sets_status_pending_attempts_zero,
+                       retry_sets_status_pending_attempts_zero);
+ADVDECK_REGISTER_TEST(outbox_retry_on_pending_row_returns_already_pending,
+                       retry_on_pending_row_returns_already_pending);
+ADVDECK_REGISTER_TEST(outbox_retry_on_unknown_id_returns_not_found,
+                       retry_on_unknown_id_returns_not_found);

@@ -57,6 +57,24 @@ class OutboxQueue {
                             const std::string& final_status,
                             std::string* err);
 
+  // Mark an errored request as pending again so the bridge picks it
+  // up on the next run-once. No-op (with *err set to "already
+  // pending") if the request is already pending or in_flight.
+  // Returns "" on success, an error message otherwise. The JSONL is
+  // rewritten atomically. `created_at` is reset to <now> and
+  // `attempts` is reset to 0.
+  std::string retry(const std::string& id, std::string* err);
+
+  // Compact `done` rows out of pending.jsonl whose results dir
+  // mtime is older than `days_threshold` days. Sets *removed to the
+  // number of rows dropped and returns "" on success. The threshold
+  // is in days; B2.1's sync UI uses 7. The mtime comes from
+  // IStorage::mtime_iso8601; rows whose result dir is missing are
+  // dropped conservatively (treated as old — the bridge has cleaned
+  // them up).
+  std::string compact_done(int days_threshold, int* removed,
+                           std::string* err);
+
   // <storage_root>/outbox/pending.jsonl
   std::string pending_path() const;
 

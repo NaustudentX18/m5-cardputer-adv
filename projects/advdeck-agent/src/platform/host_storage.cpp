@@ -50,14 +50,22 @@ fs::path resolve_under(const std::string& root, const std::string& path) {
   fs::path p(rel);
   return (fs::path(root) / p).lexically_normal();
 }
-// Format a std::filesystem::file_time_type as an ISO8601 UTC string
-// (YYYY-MM-DDTHH:MM:SSZ). On glibc 14 the file_clock shares
-// CLOCK_REALTIME with system_clock; we just take seconds-since-epoch
-// and format with gmtime. Sub-second precision is dropped.
 std::string file_time_to_iso8601_utc(std::filesystem::file_time_type ft) {
-  using Sec = std::chrono::duration<std::time_t, std::ratio<1>>;
-  std::time_t t =
-      std::chrono::duration_cast<Sec>(ft.time_since_epoch()).count();
+  using namespace std::chrono;
+  // glibc 14's std::filesystem::file_time_type uses a `__file_clock`
+  // whose epoch is not the UNIX epoch. Casting the raw duration
+  // to seconds gives a date in the year 1822, which is wrong.
+  // Compute the offset between the two clocks at startup and add
+  // it to the file's time so the result is a system_clock
+  // time_point we can gmtime.
+  auto fnow = std::filesystem::file_time_type::clock::now().time_since_epoch();
+  auto snow = system_clock::now().time_since_epoch();
+  long long offset_ns = duration_cast<nanoseconds>(snow).count() -
+                        duration_cast<nanoseconds>(fnow).count();
+  auto adjusted = ft + nanoseconds(offset_ns);
+  auto dur_ns = duration_cast<nanoseconds>(adjusted.time_since_epoch());
+  system_clock::time_point tp{nanoseconds{dur_ns.count()}};
+  std::time_t t = system_clock::to_time_t(tp);
   std::tm tm{};
 #if defined(_WIN32)
   gmtime_s(&tm, &t);
