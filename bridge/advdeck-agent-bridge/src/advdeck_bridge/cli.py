@@ -1,12 +1,18 @@
 """Click-based CLI for the AdvDeck dry-run bridge.
 
-Five subcommands (PHASE-2-INTERFACES.md §8):
+Subcommands:
 
-* ``plan``         read idea.md, run the dry-run provider, write result dir.
-* ``list``         pretty-print the pending.jsonl queue.
-* ``show <id>``    pretty-print the result manifest + artefact list.
-* ``run-once``     pick the first pending request and process it.
-* ``validate``     exit 0 if a JSON file validates against a schema, else 1.
+* ``plan``                  read idea.md, run the dry-run provider, write result dir.
+* ``plan-local``            read idea.md, run a local-file provider, write result dir.
+* ``list``                  pretty-print the pending.jsonl queue.
+* ``show <id>``             pretty-print the result manifest + artefact list.
+* ``run-once``              pick the first pending request and process it.
+* ``validate``              exit 0 if a JSON file validates against a schema, else 1.
+* ``calendar export``       write a .ics file from accepted events.
+* ``nl-date``               parse an English date expression to ISO 8601.
+* ``transcribe``            turn a WAV into transcript.md.
+* ``transcribe-and-plan``   voice-to-plan loop.
+* ``export``                rebuild a project agent pack or a GitHub-issues payload.
 
 The CLI is single-writer. Do not run multiple bridge processes against the
 same ``--storage-root`` at the same time (PHASE-2-INTERFACES.md §4.2).
@@ -52,7 +58,7 @@ from .runner import (
 )
 from .ics_export import IcsExporter, validate as ics_validate
 from .nl_date import parse_nl_date
-
+from .export import ExportError, export_project as run_export
 
 def _coerce_root(path: str | None) -> Path:
     """Return an absolute Path for the storage root, defaulting to /advdeck."""
@@ -594,3 +600,74 @@ def transcribe_and_plan(
             idea.write_text(backup, encoding="utf-8")
         elif idea.is_file():
             idea.unlink()
+
+
+# ---------------------------------------------------------------------------
+# export
+# ---------------------------------------------------------------------------
+#
+# Phase 6 / β 0.5: rebuild the project agent-pack ``export/`` folder from
+# a host, without the device attached. The default format is ``agent-pack``
+# (the same five files the C++ ``AgentPackExporter`` writes to the SD
+# card).  ``--format github-issues`` instead writes one
+# ``gh issue create --input``-shaped JSON per task, plus an ``INDEX.md``
+# explaining how to apply them. See ``advdeck_bridge.export``.
+
+
+@main.command(help="Rebuild a project's agent pack export folder from a host.")
+@click.option("--project", "project_slug", required=True, metavar="<slug>",
+              help="Project slug (must match ^[a-z0-9][a-z0-9-]{0,63}$).")
+@click.option("--out", "out_dir", required=True, metavar="<dir>",
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory to write the export into. Created if missing. "
+                   "Any prior contents are wiped on re-export.")
+@click.option("--format", "format_name", default="agent-pack",
+              type=click.Choice(["agent-pack", "github-issues"], case_sensitive=False),
+              help="Output format. Default: agent-pack.")
+@click.option("--planner-provider", default="host-export",
+              metavar="<name>",
+              help="Value written to export-info.json planner_provider. "
+                   "Default: host-export.")
+@click.option("--planner-version", default="0.5.0", metavar="<semver>",
+              help="Value written to export-info.json planner_version. "
+                   "Default: 0.5.0.")
+@click.option("--request-id", "request_id", default=None, metavar="<req-...>",
+              help="Optional bridge request id to record in export-info.json.")
+@click.option("--storage-root", default=None, metavar="<path>",
+              help="Storage root (default: /advdeck).")
+def export_cmd(
+    project_slug: str,
+    out_dir: Path,
+    format_name: str,
+    planner_provider: str,
+    planner_version: str,
+    request_id: str | None,
+    storage_root: str | None,
+) -> None:
+    """``advdeck-bridge export`` body."""
+    root = _coerce_root(storage_root)
+    try:
+        result = run_export(
+            root,
+            project_slug,
+            out_dir,
+            format=format_name,
+            planner_provider=planner_provider,
+            planner_version=planner_version,
+            request_id=request_id,
+        )
+    except ExportError as exc:
+        click.echo(f"export: error: {exc}", err=True)
+        sys.exit(2)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"export: unexpected error: {exc}", err=True)
+        sys.exit(2)
+
+    click.echo(
+        f"export: wrote {len(result.written_files)} file(s) to {result.out_dir} "
+        f"(format={result.format})"
+    )
+    for name in result.written_files:
+        click.echo(f"  - {name}")
+    for warn in result.warnings:
+        click.echo(f"warning: {warn}")

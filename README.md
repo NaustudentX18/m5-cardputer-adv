@@ -104,9 +104,9 @@ project-slug/
     </tr>
     <tr>
       <td><b>α 0.2</b></td>
-      <td><b>Real planner bridge</b> — local dry-run provider → first live LLM adapter, schema validation, artifact writer</td>
-      <td><img src="https://img.shields.io/badge/BRIDGE_PROTOCOL-44cc11?style=flat-square" alt="Bridge protocol done"></td>
-      <td><code>██████</code> 60%</td>
+      <td><b>Real planner bridge</b> — local dry-run + local-file + opt-in OpenAI providers, schema validation, retryable error taxonomy, raw-output audit log</td>
+      <td><img src="https://img.shields.io/badge/DONE-44cc11?style=flat-square" alt="Done"></td>
+      <td><code>██████████</code> 100%</td>
     </tr>
     <tr>
       <td><b>α 0.3</b></td>
@@ -122,11 +122,16 @@ project-slug/
     </tr>
     <tr>
       <td><b>β 0.5</b></td>
-      <td><b>Agent workflow polish</b> — stronger task schema, dependency ordering, role suggestions, workspace export</td>
-      <td><img src="https://img.shields.io/badge/PLANNED-555?style=flat-square" alt="Planned"></td>
-      <td><code>░░░░░░░░░░</code> 0%</td>
+      <td><b>Agent workflow polish</b> — calendar accept/reject, <code>.ics</code> export, app-running reminders, host-side <code>export</code> CLI, GitHub-issues fan-out</td>
+      <td><img src="https://img.shields.io/badge/DONE-44cc11?style=flat-square" alt="Done"></td>
+      <td><code>██████████</code> 100%</td>
     </tr>
-  </tbody>
+    <tr>
+      <td><b>v0.5.0</b></td>
+      <td><b>MVP</b> — all five phases + β 0.5 polish shipped, 268/268 tests green</td>
+      <td><img src="https://img.shields.io/badge/TAGGED-44cc11?style=flat-square" alt="v0.5.0 tagged"></td>
+      <td><code>██████████</code> 100%</td>
+    </tr>
 </table>
 
 ### ✦ Later / Out of MVP
@@ -154,7 +159,19 @@ pio run -e cardputer-adv
 
 # Bridge (dry-run mode — no credentials needed)
 cd ../../bridge/advdeck-agent-bridge
-# TBD once implementation starts
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[test]'
+pytest -q                         # 161 passed
+
+# From any storage root, generate a project plan:
+advdeck-bridge plan --project <slug> --storage-root /advdeck
+
+# Rebuild the project agent pack on a host (no device needed):
+advdeck-bridge export --project <slug> --storage-root /advdeck --out ./export
+
+# Or fan tasks out into GitHub issues:
+advdeck-bridge export --project <slug> --storage-root /advdeck \
+    --out ./issues --format github-issues
 ```
 
 | Path | Start with |

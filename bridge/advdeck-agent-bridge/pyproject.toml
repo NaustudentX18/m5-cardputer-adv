@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "advdeck-bridge"
-version = "0.3.0"
-description = "AdvDeck Agent Phase 3 bridge CLI (dry-run + local-file + opt-in OpenAI providers)."
+version = "0.5.0"
+description = "AdvDeck Agent v0.5.0 bridge CLI: dry-run + local-file + opt-in OpenAI planner providers, host-side agent-pack and GitHub-issues export."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

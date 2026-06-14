@@ -4,16 +4,29 @@ Pocket agent front-end for the M5Stack Cardputer-Adv.
 
 ## Current Status
 
-Phase 1 — **Offline Project Capture** — implemented.
+**MVP shipped** (v0.5.0, 2026-06-15). All five alpha phases plus β 0.5
+polish landed on `main`. Firmware host tests **107/107** pass green.
 
-- Text idea capture (multiline editor)
-- Project folders on SD with slug-based unique names
-- Local task lists (per project)
-- Local calendar events (global, with `project` tag for filtering later)
-- Power-cycle-safe (everything is plain files on SD)
-- No AI / cloud / Wi-Fi / radio at boot
+- Phase 1: text idea capture (multiline editor) ✅
+- Phase 1: project folders on SD with slug-based unique names ✅
+- Phase 1: local task lists (per project) ✅
+- Phase 1: local calendar events (global, with `project` tag) ✅
+- Phase 2: bridge outbox queue + importer ✅
+- Phase 2: bridge log + staging queue ✅
+- Phase 3: review screen + stage-only bridge import ✅
+- Phase 3: agent pack export (`export/agent-pack.md` + tasks) ✅
+- Phase 4: SD-aware `WavWriter` + `Recorder` + recording UI ✅
+- Phase 4: voice-to-plan wired through bridge (`transcribe-and-plan`) ✅
+- Phase 5: calendar accept/reject flow + `.ics` export ✅
+- Phase 5: app-running reminder alerts ✅
 
-A12 will polish the 240x135 UX; Phase 2 adds the bridge protocol and fixture import; Phase 3 replaces fixtures with a real planner.
+Power-cycle-safe throughout (plain files on SD). No AI / cloud / Wi-Fi /
+radio at boot.
+
+Later / out of MVP: BLE HID snippet export, WebUI over SoftAP, local
+workspace watcher, companion C5 status panel, LoRa/GPS project metadata,
+optional issue tracker integrations, optional secure sync. See the
+top-level `ROADMAP.md` for the full list.
 
 ## Build & Test
 
@@ -31,19 +44,31 @@ make -C test/host test
 
 The host tests cover slug generation, storage atomic writes, project CRUD, task CRUD, and calendar events. They run in milliseconds on the host and use a temp-dir-backed `HostStorage` so each test is isolated.
 
-## Target Alpha
+## Bridge integration
 
-AdvDeck Agent Alpha 0.1 supports:
+The `bridge/advdeck-agent-bridge/` CLI is the off-device helper for AI
+planning. Firmware side:
 
-- text idea capture
-- project folders on SD
-- local tasks
-- local calendar events
-- bridge fixture import (Phase 2)
-- generated artifact review UI (Phase 3)
-- agent pack export (Phase 6)
+- enqueues a `plan_project` request to `outbox/pending.jsonl`,
+- the bridge processes it and writes the six artefacts to
+  `outbox/results/<id>/`,
+- `BridgeImport` validates the result manifest, stages the artefacts
+  into `<project>/.staging/`, and waits for the user to **accept** or
+  **reject** on the review screen,
+- on accept the artefacts land in `<project>/` and the
+  `AgentPackExporter` rebuilds `export/agent-pack.md` + tasks on the
+  SD card.
 
-Voice capture and real speech-to-text come after the text-to-plan loop works.
+The host side has a mirror command — `advdeck-bridge export
+--project <slug> --out <dir>` — that rebuilds the same `export/`
+folder from a laptop without the device attached. `advdeck-bridge
+export --format github-issues` fans the tasks out into
+`gh issue create --input`-shaped JSON for tracker fan-out.
+
+Voice input is wired end-to-end: `Recorder` writes a SHA-256-manifest
+WAV to SD, the bridge transcribes it with one of `mock`,
+`local-whisper`, or `openai` providers, and the transcript is
+chained into the planning flow via `transcribe-and-plan`.
 
 ## Implementation Constraints
 
@@ -76,11 +101,18 @@ test/host/                     # g++ host tests + Makefile + verify.sh
 third_party/nlohmann/          # vendored MIT single-header
 boards/                        # local m5stack-cardputer board + pinout
 ```
+The bridge service lives in `../../bridge/advdeck-agent-bridge/` and is
+already wired into the firmware's `outbox`/`inbox`/review flow (see
+the `Bridge integration` section above).
 
-The bridge service lives separately under `../../bridge/advdeck-agent-bridge/` and will be wired in during Phase 2.
+## Implementation Order
 
-## First Implementation
-
-`A01 Firmware Skeleton` (done) → `A02 Storage Contract` (done) → `A04 Local Tasks` (done) → `A05 Calendar` (done) → `A03 Capture + Browser` (in flight) → `Z01 Verification Harness` (done).
-
-See `../../PHASE-1-INTERFACES.md` for the shared contract used by the swarm, and `../../roadmap/advdeck-agent-swarm-tasks.md` for the full task list.
+`A01 Firmware Skeleton` → `A02 Storage Contract` → `A04 Local Tasks` →
+`A05 Calendar` → `A03 Capture + Browser` → `Z01 Verification Harness` →
+`B1.1–B1.3 Bridge Protocol` → `B2.x Bridge Importer` → `B3.x Review
+Gate` → `C1.1 Real Providers` → `C1.2 Agent Pack Export` → `C1.3 Sync
+UI` → `D1.1 Recorder` → `D1.3 Transcription` → `E1.1–E1.3 Calendar +
+Reminders + Polish`. All landed on `main` as of v0.5.0.
+See `../../PHASE-5-INTERFACES.md` for the shared contract used by the
+swarm across Phases 1–5, and `../../roadmap/advdeck-agent-swarm-tasks.md`
+for the historical task list.
