@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecordingManifest",
+  "type": "object",
+  "required": ["version", "file", "duration_ms", "sample_rate", "captured_at", "sha256"],
+  "properties": {
+    "version":          { "type": "number", "const": 1 },
+    "file":             { "type": "string", "pattern": "^recording-[0-9]+.wav$" },
+    "duration_ms":      { "type": "number", "minimum": 0 },
+    "sample_rate":      { "type": "number", "enum": [8000, 11025, 16000, 22050, 44100, 48000] },
+    "channels":         { "type": "number", "enum": [1, 2] },
+    "bits_per_sample":  { "type": "number", "enum": [8, 16] },
+    "captured_at":      { "type": "string", "format": "date-time" },
+    "sha256":           { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}

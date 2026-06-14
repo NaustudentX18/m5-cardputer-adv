@@ -21,10 +21,16 @@ from pathlib import Path
 import click
 
 from . import validation
-from .providers import ProviderUnavailable, get_provider
+from .providers import (
+    ProviderError,
+    ProviderUnavailable,
+    get_provider,
+    get_transcription_provider,
+)
 from .paths import (
     DEFAULT_STORAGE_ROOT,
     pending_path,
+    project_dir,
     result_dir,
 )
 from .queue import (
@@ -304,3 +310,194 @@ def validate_cmd(fixture: Path, schema: Path) -> None:
 
 if __name__ == "__main__":
     main()
+
+# ---------------------------------------------------------------------------
+# transcribe
+# ---------------------------------------------------------------------------
+#
+# Phase 4 (D1.3) per PHASE-4-INTERFACES.md §5.3: turn a recording's WAV
+# into ``transcript.md`` using a named provider. Does not touch the
+# project folder or the outbox; ``transcribe-and-plan`` chains the
+# transcript into the planning flow.
+
+
+@main.command(
+    help="Transcribe a single WAV file to ``<out>/transcript.md`` using the "
+         "named provider. Does not touch the project folder or the outbox "
+         "(PHASE-4-INTERFACES.md §5.3).",
+)
+@click.option("--wav", "wav_path", required=True, metavar="<path>",
+              type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="Path to the recording's WAV file.")
+@click.option("--out", "out_dir", required=True, metavar="<dir>",
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory to write ``transcript.md`` into. Created if missing.")
+@click.option("--language", default="en", metavar="<bcp47>",
+              help="BCP-47 language tag forwarded to the provider. Default: en.")
+@click.option("--provider", "provider_name", default="mock",
+              type=click.Choice(["mock", "local-whisper", "openai"], case_sensitive=False),
+              help="Transcription provider to use. Default: mock.")
+@click.option("--manifest", "manifest_path", default=None, metavar="<path>",
+              type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="Optional recording manifest. If given, it is validated against "
+                   "the recording-manifest schema and the validation is echoed "
+                   "to stdout. The CLI still writes transcript.md regardless.")
+@click.option("--storage-root", default=None, metavar="<path>",
+              help="Storage root (default: /advdeck). Reserved for future use.")
+def transcribe(
+    wav_path: Path,
+    out_dir: Path,
+    language: str,
+    provider_name: str,
+    manifest_path: Path | None,
+    storage_root: str | None,
+) -> None:
+    """``advdeck-bridge transcribe`` body."""
+    # The Click ``exists=True`` flag covers existence; we also check the
+    # size so a zero-byte file (a known race during recording-stop) fails
+    # loudly instead of silently producing an empty transcript.
+    wav = Path(wav_path)
+    if wav.stat().st_size == 0:
+        click.echo(f"transcribe: error: WAV file is empty: {wav}", err=True)
+        sys.exit(2)
+
+    # Optional manifest validation: a debugging aid for the operator.
+    # The CLI does not fail if the manifest is absent.
+    if manifest_path is not None:
+        try:
+            instance = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+            schema = validation.load_schema("recording-manifest")
+            validation.validate(instance, schema)
+            click.echo(f"manifest: ok ({manifest_path})")
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"transcribe: manifest validation failed: {exc}", err=True)
+            sys.exit(1)
+
+    try:
+        provider = get_transcription_provider(provider_name)
+    except ProviderUnavailable as exc:
+        click.echo(f"transcribe: error: {exc}", err=True)
+        sys.exit(2)
+
+    try:
+        transcript = provider.transcribe(wav, language=language)
+    except ProviderError as exc:  # type: ignore[misc]
+        # ProviderError is a RuntimeError; CLI maps to a non-zero exit
+        # and prints the provider's message verbatim.
+        click.echo(f"transcribe: provider error: {exc}", err=True)
+        sys.exit(1)
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / "transcript.md"
+    target.write_text(transcript, encoding="utf-8")
+    click.echo(f"transcribe: wrote {target} (provider={provider.name()})")
+
+
+# ---------------------------------------------------------------------------
+# transcribe-and-plan
+# ---------------------------------------------------------------------------
+#
+# Phase 4 (D1.3) per PHASE-4-INTERFACES.md §5.3: voice-to-plan loop.
+# Transcribe the WAV, write the transcript, then run the local-file
+# planner against the transcript as the project's idea text. The result
+# manifest is the standard six-artefact shape (brief/plan/tasks/...).
+
+
+@main.command(
+    help="Transcribe a WAV and run the planning flow against the "
+         "transcript. Writes ``transcript.md`` to the project dir and the "
+         "standard six-artefact result manifest to ``outbox/results/<id>/``. "
+         "The planner is driven by the local-file provider "
+         "(PHASE-4-INTERFACES.md §5.3).",
+)
+@click.option("--wav", "wav_path", required=True, metavar="<path>",
+              type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="Path to the recording's WAV file.")
+@click.option("--project", "project_slug", required=True, metavar="<slug>",
+              help="Project slug (must match ^[a-z0-9][a-z0-9-]{0,63}$).")
+@click.option("--artifacts", "artifacts_dir", required=True, metavar="<dir>",
+              type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory containing pre-rendered brief.md, plan.md, "
+                   "tasks.json, tasks.md, calendar-suggestions.json, "
+                   "agent-prompt.md.")
+@click.option("--out", "out_dir", required=True, metavar="<dir>",
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory to write ``transcript.md`` into (typically the "
+                   "project dir). Created if missing.")
+@click.option("--storage-root", default=None, metavar="<path>",
+              help="Storage root (default: /advdeck).")
+def transcribe_and_plan(
+    wav_path: Path,
+    project_slug: str,
+    artifacts_dir: Path,
+    out_dir: Path,
+    storage_root: str | None,
+) -> None:
+    """``advdeck-bridge transcribe-and-plan`` body."""
+    root = _coerce_root(storage_root)
+    wav = Path(wav_path)
+    if wav.stat().st_size == 0:
+        click.echo(f"transcribe-and-plan: error: WAV file is empty: {wav}", err=True)
+        sys.exit(2)
+
+    # Step 1: transcribe the WAV. The Phase 4 voice-to-plan loop always
+    # uses the mock provider; the live providers will be swapped in by
+    # the operator's bridge invocation. The factory seam is real, the
+    # choice is just hard-coded for now.
+    try:
+        provider = get_transcription_provider("mock")
+    except ProviderUnavailable as exc:
+        click.echo(f"transcribe-and-plan: error: {exc}", err=True)
+        sys.exit(2)
+    try:
+        transcript = provider.transcribe(wav)
+    except ProviderError as exc:  # type: ignore[misc]
+        click.echo(f"transcribe-and-plan: provider error: {exc}", err=True)
+        sys.exit(1)
+
+    # Step 2: write transcript.md to the requested --out dir (typically
+    # the project dir). Per §2, this is the project-level
+    # ``transcript.md`` the firmware will read in the review flow.
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    transcript_path = out / "transcript.md"
+    transcript_path.write_text(transcript, encoding="utf-8")
+    click.echo(f"transcribe-and-plan: wrote {transcript_path}")
+
+    # Step 3: run the planner with the local-file provider. The planner
+    # reads ``idea.md`` from disk; we temporarily write the transcript
+    # to ``idea.md`` for the duration of this command so the planner
+    # has something to read. We back up + restore the original so the
+    # "idea.md is write-once" rule is honoured after the command exits.
+    proj = project_dir(root, project_slug)
+    idea = proj / "idea.md"
+    backup: str | None = None
+    if idea.is_file():
+        backup = idea.read_text(encoding="utf-8")
+    try:
+        proj.mkdir(parents=True, exist_ok=True)
+        idea.write_text(transcript, encoding="utf-8")
+        try:
+            plan_provider = get_provider("local-file", artifacts_dir=str(artifacts_dir))
+        except ProviderUnavailable as exc:
+            click.echo(f"transcribe-and-plan: error: {exc}", err=True)
+            sys.exit(2)
+        try:
+            result = plan_project(root, project_slug, provider=plan_provider)
+        except BridgeError as exc:
+            click.echo(f"transcribe-and-plan: bridge error: {exc}", err=True)
+            sys.exit(2)
+        click.echo(
+            f"transcribe-and-plan: wrote {len(result.manifest['artifacts'])} "
+            f"artefacts to {result.artifacts_dir}"
+        )
+        for name in result.manifest["artifacts"]:
+            click.echo(f"  - {name}")
+    finally:
+        # Restore (or remove) the original idea.md so the file system
+        # state matches what it was before this command ran.
+        if backup is not None:
+            idea.write_text(backup, encoding="utf-8")
+        elif idea.is_file():
+            idea.unlink()

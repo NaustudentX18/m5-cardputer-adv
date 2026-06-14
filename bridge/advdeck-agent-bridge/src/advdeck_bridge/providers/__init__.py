@@ -18,6 +18,7 @@ refactor.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 from ..queue import PendingRequest
@@ -135,6 +136,112 @@ PROVIDER_REGISTRY: dict[str, dict[str, str]] = {
         "kind": "live",
     },
 }
+# ---------------------------------------------------------------------------
+# Transcription providers (Phase 4, D1.3)
+# ---------------------------------------------------------------------------
+#
+# The transcription sub-protocol mirrors ``Provider`` but returns a single
+# transcript string instead of the six planning artefacts. The CLI uses
+# this to turn a recording's WAV into ``transcript.md`` before kicking
+# off the planning flow (PHASE-4-INTERFACES.md §5.2).
+#
+# ``TranscriptionProvider`` lives next to ``Provider`` so the seam is
+# discoverable. The factory ``get_transcription_provider`` mirrors
+# ``get_provider`` and raises ``ProviderUnavailable`` for unknown names.
+
+
+class TranscriptionProvider(Protocol):
+    """Render the transcript of one WAV file.
+
+    Implementations return a single string. The string MAY include a
+    leading ``DURATION: <s>s\nWORDS: <n>\n`` header (per the spec);
+    the CLI strips / passes it through unchanged. Implementations
+    raise the same ``ProviderError`` subclasses as ``Provider``.
+    """
+
+    def name(self) -> str: ...
+
+    def transcribe(self, wav_path: Path, *, language: str = "en") -> str: ...
+
+
+TRANSCRIPTION_REGISTRY: dict[str, dict[str, str]] = {
+    "mock": {
+        "module": "advdeck_bridge.providers.transcription.mock",
+        "class": "MockTranscriptionProvider",
+        "version": "1.0.0",
+        "kind": "test",
+    },
+    "local-whisper": {
+        "module": "advdeck_bridge.providers.transcription.local_whisper",
+        "class": "LocalWhisperProvider",
+        "version": "1.0.0",
+        "kind": "test",
+    },
+    "openai": {
+        "module": "advdeck_bridge.providers.transcription.openai",
+        "class": "OpenAITranscriptionProvider",
+        "version": "1.0.0",
+        "kind": "live",
+    },
+}
+
+
+def _import_transcription_provider_class(name: str) -> type:
+    """Import the transcription provider class registered under ``name``.
+
+    Mirrors ``_import_provider_class`` for the planning-side registry.
+    """
+    if name not in TRANSCRIPTION_REGISTRY:
+        raise ProviderUnavailable(
+            f"unknown transcription provider: {name!r}; "
+            f"known: {sorted(TRANSCRIPTION_REGISTRY)}"
+        )
+    entry = TRANSCRIPTION_REGISTRY[name]
+    try:
+        module = __import__(entry["module"], fromlist=[entry["class"]])
+    except ImportError as exc:
+        raise ProviderUnavailable(
+            f"transcription provider {name!r} requires the [{name}] extra: {exc}"
+        ) from exc
+    return getattr(module, entry["class"])
+
+
+def get_transcription_provider(name: str, **kwargs: Any) -> "TranscriptionProvider":
+    """Return an instantiated transcription provider by name.
+
+    Args:
+        name: One of ``mock``, ``local-whisper``, ``openai``.
+        **kwargs: Forwarded to the provider's constructor. Per-provider
+            kwargs are validated here so a CLI typo surfaces as a clean
+            ``ProviderUnavailable`` error, not a ``TypeError`` at
+            transcribe() time.
+
+    Raises:
+        ProviderUnavailable: Unknown name or missing optional dep.
+    """
+    if name == "mock":
+        cls = _import_transcription_provider_class(name)
+        # Optional ``fixtures`` kwarg overrides the canned transcripts.
+        return cls(**kwargs)  # type: ignore[abstract]
+    if name == "local-whisper":
+        cls = _import_transcription_provider_class(name)
+        allowed = {"binary", "timeout_seconds"}
+        unknown = set(kwargs) - allowed
+        if unknown:
+            raise ProviderUnavailable(
+                f"local-whisper provider does not accept: {sorted(unknown)}"
+            )
+        return cls(**kwargs)
+    if name == "openai":
+        cls = _import_transcription_provider_class(name)
+        allowed = {"model", "api_key", "timeout_seconds", "language"}
+        unknown = set(kwargs) - allowed
+        if unknown:
+            raise ProviderUnavailable(
+                f"openai transcription provider does not accept: {sorted(unknown)}"
+            )
+        return cls(**kwargs)
+    raise ProviderUnavailable(f"unknown transcription provider: {name!r}")
 
 
 def _import_provider_class(name: str) -> type:
