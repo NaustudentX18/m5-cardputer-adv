@@ -8,7 +8,7 @@
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="#"><img src="https://img.shields.io/badge/platform-ESP32--S3-00f0ff?logo=espressif" alt="ESP32-S3"></a>
   <a href="#"><img src="https://img.shields.io/badge/hardware-Cardputer--Adv-ffb300" alt="Cardputer-Adv"></a>
-  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/alpha_0.2-bridge_protocol-ffb300?style=flat-square" alt="Phase 2 bridge protocol done"></a>
+  <a href="https://github.com/NaustudentX18/m5-cardputer-adv/blob/main/ROADMAP.md"><img src="https://img.shields.io/badge/alpha_0.3-real_planner-ffb300?style=flat-square" alt="Phase 3 real planner in progress"></a>
   <a href="https://github.com/NaustudentX18/m5-cardputer-adv/stargazers"><img src="https://img.shields.io/github/stars/NaustudentX18/m5-cardputer-adv?style=social" alt="Stars"></a>
 </p>
 
@@ -84,7 +84,7 @@ project-slug/
 
 ## ✦ Roadmap
 
-**Current progress:** `██████░░░░░░░░░░░░░` **60%** complete · **Phase 2 of 5**
+**Current progress:** `██████████░░░░░░░░░░` **80%** complete · **Phase 3 of 5**
 
 <table>
   <thead>
@@ -109,12 +109,12 @@ project-slug/
       <td><code>██████</code> 60%</td>
     </tr>
     <tr>
+    <tr>
       <td><b>α 0.3</b></td>
       <td><b>Calendar intelligence</b> — AI-generated schedule suggestions, accept/reject flow, <code>.ics</code> export, reminders</td>
-      <td><img src="https://img.shields.io/badge/PLANNED-555?style=flat-square" alt="Planned"></td>
-      <td><code>░░░░░░░░░░</code> 0%</td>
+      <td><img src="https://img.shields.io/badge/REAL_PLANNER-ffb300?style=flat-square" alt="Real planner in progress"></td>
+      <td><code>████████</code> 80%</td>
     </tr>
-    <tr>
       <td><b>α 0.4</b></td>
       <td><b>Voice capture</b> — ES8311 recording, WAV→SD, transcription bridge, transcript→plan pipeline</td>
       <td><img src="https://img.shields.io/badge/PLANNED-555?style=flat-square" alt="Planned"></td>
