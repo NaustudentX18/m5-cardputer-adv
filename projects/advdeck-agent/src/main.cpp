@@ -156,6 +156,24 @@ void loop() {
           ctx.last_created_slug = current_slug;
           next = advdeck::app::route_export(ctx);
           break;
+        case advdeck::app::Route::Record: {
+          // D1.1: home menu entry. Stash the sticky slug so
+          // route_record's project picker sees the same one
+          // the detail / task / export screens see. If
+          // current_slug is empty, the picker falls back to
+          // the first project in the list (mirrors
+          // route_project_detail).
+          ctx.last_created_slug = current_slug;
+          next = advdeck::app::route_record(ctx);
+          if (next == advdeck::app::Route::Home) {
+            // Pull the slug the picker resolved to (if any)
+            // and remember it for subsequent routes.
+            if (!ctx.last_created_slug.empty()) {
+              current_slug = ctx.last_created_slug;
+            }
+          }
+          break;
+        }
         case advdeck::app::Route::Review: {
           // B3.1: pull the most recent pending staging entry and
           // hand it to route_review. If there is nothing pending,

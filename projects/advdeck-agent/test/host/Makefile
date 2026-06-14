@@ -30,6 +30,8 @@ SERVICE_SRCS := \
 	$(ROOT)/src/services/agent_pack_exporter.cpp \
 	$(ROOT)/src/services/bridge_import.cpp \
 	$(ROOT)/src/services/bridge_log.cpp \
+	$(ROOT)/src/services/wav_writer.cpp \
+	$(ROOT)/src/services/recorder.cpp \
 	$(ROOT)/src/platform/host_storage.cpp
 
 # Platform sources with no Arduino / M5 dependency on host.
@@ -54,7 +56,8 @@ UI_SRCS := \
 APP_SRCS := \
 	$(ROOT)/src/app/sync.cpp \
 	$(ROOT)/src/app/export.cpp \
-	$(ROOT)/src/app/review.cpp
+	$(ROOT)/src/app/review.cpp \
+	$(ROOT)/src/app/recorder.cpp
 
 TEST_SRCS := \
 	test_main.cpp \
@@ -70,7 +73,10 @@ TEST_SRCS := \
 	test_bridge_import.cpp \
 	test_bridge_log.cpp \
 	test_agent_pack_exporter.cpp \
-	test_review_screen.cpp
+	test_review_screen.cpp \
+	test_wav_writer.cpp \
+	test_recorder.cpp \
+	test_recorder_screen.cpp
 
 # Optional: test_text_editor.cpp is added by A03 when the editor lands.
 EXTRA_TEST_SRCS := $(wildcard test_text_editor.cpp)
@@ -95,6 +101,7 @@ SCHEMA_DEPS := \
 	$(ROOT)/schemas/pending-request.schema.json \
 	$(ROOT)/schemas/result-manifest.schema.json \
 	$(ROOT)/schemas/agent-pack-export-info.schema.json \
+	$(ROOT)/schemas/recording-manifest.schema.json \
 	$(ROOT)/scripts/build_schema_embed.py
 .PHONY: all test clean schemas
 

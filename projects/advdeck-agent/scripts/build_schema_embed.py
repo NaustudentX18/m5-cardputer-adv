@@ -31,6 +31,7 @@ SCHEMA_FILES = [
     "pending-request.schema.json",
     "result-manifest.schema.json",
     "agent-pack-export-info.schema.json",
+    "recording-manifest.schema.json",
 ]
 
 # Map the file basename to the C++ symbol we expose.
@@ -38,6 +39,7 @@ SYMBOL_NAMES = {
     "pending-request.schema.json": "kPendingRequestSchema",
     "result-manifest.schema.json": "kResultManifestSchema",
     "agent-pack-export-info.schema.json": "kAgentPackExportInfoSchema",
+    "recording-manifest.schema.json": "kRecordingManifestSchema",
 }
 
 

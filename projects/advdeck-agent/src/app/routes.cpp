@@ -5,10 +5,10 @@
 // A04 (this task) replaces the TaskList body with a real per-project
 // task list, and A03 / A05 will fill in the rest. main.cpp owns the
 // loop and the active route; this file just maps Route -> draw+wait.
-
 #include "app/capture.h"
 #include "app/projects.h"
 #include "app/calendar.h"
+#include "app/recorder.h"
 #include "app/sync.h"
 #include "app/export.h"
 #include "app/review.h"
@@ -22,7 +22,6 @@
 #include "platform/keyboard.h"
 #include "ui/menu.h"
 #include "ui/status_bar.h"
-
 namespace advdeck {
 namespace app {
 
@@ -63,7 +62,8 @@ Route route_home(Ctx& ctx) {
   // capture / projects / tasks / calendar. Each entry just shows its
   // label for now; A03..A05 will replace the body.
   const std::vector<std::string> items = {
-      "Capture", "Projects", "Tasks", "Calendar", "Sync", "Export", "Review",
+      "Capture", "Projects", "Tasks", "Calendar", "Record", "Sync", "Export",
+      "Review",
   };
   const ui::Menu menu(disp());
   const ui::MenuResult picked = menu.run(items, 0);
@@ -73,9 +73,10 @@ Route route_home(Ctx& ctx) {
     case 1: return Route::ProjectList;
     case 2: return Route::TaskList;
     case 3: return Route::Calendar;
-    case 4: return Route::Sync;
-    case 5: return Route::Export;
-    case 6: return Route::Review;
+    case 4: return Route::Record;
+    case 5: return Route::Sync;
+    case 6: return Route::Export;
+    case 7: return Route::Review;
     default: return Route::Home;
   }
 }
@@ -141,6 +142,21 @@ Route route_review(Ctx& ctx, const std::string& request_id) {
   // route_review_impl so the host tests can build the summary
   // string without driving a blocking display.
   return route_review_impl(ctx, request_id);
+}
+
+Route route_record(Ctx& ctx) {
+  // D1.1: home menu entry point. Picks the current project
+  // (mirroring route_project_detail's fallback to the first
+  // project) and dispatches to the list view.
+  return route_record_entry_point(ctx);
+}
+
+Route route_record_list(Ctx& ctx, const std::string& slug) {
+  // D1.1: thin wrapper. The actual key loop lives in
+  // recorder.cpp's route_record_list_impl so the host tests
+  // can build the screen string without driving a blocking
+  // display.
+  return route_record_list_impl(ctx, slug);
 }
 
 }  // namespace app

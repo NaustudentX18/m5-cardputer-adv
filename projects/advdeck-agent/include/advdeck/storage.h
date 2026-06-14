@@ -121,6 +121,9 @@ class SdStorage : public IStorage {
   std::string join(const std::string& a, const std::string& b) override;
   std::string mtime_iso8601(const std::string& path) override;
   std::string root() const override;
+
+ private:
+  bool mounted_ = false;
 };
 #endif  // ADVDECK_FIRMWARE
 
