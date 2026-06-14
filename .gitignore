@@ -6,7 +6,25 @@ dist/
 *.elf
 *.map
 *.uf2
+*.o
+*.a
 
+# Phase 1: agent task notes (ephemeral, kept locally only)
+projects/advdeck-agent/.notes/
+projects/advdeck-agent/firmware/
+
+# Phase 2: bridge task notes (ephemeral, kept locally only)
+bridge/advdeck-agent-bridge/.notes/
+
+# Phase 2: bridge build artifacts
+bridge/advdeck-agent-bridge/src/*.egg-info/
+bridge/advdeck-agent-bridge/src/advdeck_bridge/__pycache__/
+bridge/advdeck-agent-bridge/src/advdeck_bridge/providers/__pycache__/
+bridge/advdeck-agent-bridge/tests/__pycache__/
+
+# Phase 1: host test build artifacts
+projects/advdeck-agent/test/host/run_tests
+projects/advdeck-agent/test/host/run_tests.dSYM/
 # Python
 __pycache__/
 .pytest_cache/

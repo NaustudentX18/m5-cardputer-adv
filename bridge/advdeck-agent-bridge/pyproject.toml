@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advdeck-bridge"
+version = "0.5.0"
+description = "AdvDeck Agent v0.5.0 bridge CLI: dry-run + local-file + opt-in OpenAI planner providers, host-side agent-pack and GitHub-issues export."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "AdvDeck" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "click>=8.0,<9.0",
+    "jsonschema>=4.0,<5.0",
+    "rfc3339-validator>=0.1.0",   # provides the date-time format checker
+    "rfc3986-validator>=0.1.0",   # provides the uri / iri format checkers
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+# The live "openai" provider is opt-in. The base install stays light
+# so users who only need the dry-run / local-file providers do not
+# pull in the OpenAI SDK.
+live = [
+    "openai>=1.0,<2.0",
+]
+
+[project.scripts]
+advdeck-bridge = "advdeck_bridge.cli:main"
+
+[project.urls]
+# Internal; not published.
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"advdeck_bridge" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

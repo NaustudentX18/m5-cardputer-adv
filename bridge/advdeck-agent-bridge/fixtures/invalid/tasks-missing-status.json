@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "ok-1",
+      "title": "First task with status",
+      "status": "todo"
+    },
+    {
+      "id": "bad-1",
+      "title": "Second task missing status field"
+    }
+  ]
+}

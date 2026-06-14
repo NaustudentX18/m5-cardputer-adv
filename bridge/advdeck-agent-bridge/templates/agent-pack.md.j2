@@ -1,0 +1,57 @@
+{# agent-pack.md.j2
+   Agent pack for project: {{ project_slug }}
+   Variables: project_slug, project_title, idea, brief, plan, tasks, calendar_suggestions
+   The .md (frozen) copy is what the Phase 2 dry-run provider actually substitutes.
+   Phase 3 (A08) will render this template via Jinja2 against real LLM output. #}
+# {{ project_title }}
+
+> Project slug: `{{ project_slug }}`
+> This pack is a self-contained handoff for an external coding agent.
+> Read it top-to-bottom. It is the only authoritative source for this project.
+
+---
+
+## 1. Idea
+
+{{ idea }}
+
+---
+
+## 2. Brief
+
+{{ brief }}
+
+---
+
+## 3. Plan
+
+{{ plan }}
+
+---
+
+## 4. Tasks
+
+The full task list lives in `tasks.json` next to this file. Below is a human-readable
+view of the same data; trust `tasks.json` as the source of truth.
+
+{{ tasks }}
+
+---
+
+## 5. Calendar suggestions
+
+The bridge also produced `calendar-suggestions.json` with time-boxed reminders that
+correspond to the task list. They are *suggestions* — the user has not accepted them
+in Phase 2.
+
+{{ calendar_suggestions }}
+
+---
+
+## 6. Working agreements
+
+- Do not invent requirements not present in the brief, plan, or tasks.
+- If a task's `acceptance_criteria` is ambiguous, ask before implementing.
+- Prefer the smallest change that satisfies the task's `validation` list.
+- Match existing style in `files_or_modules`; do not refactor adjacent code.
+- Run the project's existing tests before declaring a task done.

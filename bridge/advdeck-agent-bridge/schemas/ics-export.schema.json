@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IcsExportSpec",
+  "type": "object",
+  "required": ["version", "min_rfc5545_conformance"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "min_rfc5545_conformance": { "type": "boolean", "const": true },
+    "prodid": { "type": "string" },
+    "line_folding": { "type": "boolean", "const": true },
+    "max_line_length": { "type": "number", "const": 75 }
+  },
+  "additionalProperties": false
+}
